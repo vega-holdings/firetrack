@@ -12,8 +12,23 @@ interface FilterState {
 
 interface SyncState {
   isSyncing: boolean;
+  isSyncingFederal: boolean;
   lastSyncTime: string | null;
+  lastFederalSyncTime: string | null;
   totalBillsSynced: number;
+  totalFederalBillsSynced: number;
+}
+
+interface ChatState {
+  isOpen: boolean;
+  messages: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+  }>;
+  attachments: Array<{
+    name: string;
+    url: string;
+  }>;
 }
 
 interface UIState {
@@ -22,17 +37,26 @@ interface UIState {
   filters: FilterState;
   darkMode: boolean;
   sync: SyncState;
+  chat: ChatState;
 }
 
 interface UIActions {
   setSyncing: (isSyncing: boolean) => void;
+  setSyncingFederal: (isSyncing: boolean) => void;
   updateSyncStats: (totalBills: number) => void;
+  updateFederalSyncStats: (totalBills: number) => void;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
   setSelectedBill: (billId: string | null) => void;
   setFilter: (key: keyof FilterState, value: string | number | null) => void;
   resetFilters: () => void;
   toggleDarkMode: () => void;
+  // Chat actions
+  toggleChat: () => void;
+  setChatOpen: (open: boolean) => void;
+  addMessage: (message: { role: 'user' | 'assistant'; content: string }) => void;
+  addAttachment: (attachment: { name: string; url: string }) => void;
+  clearChat: () => void;
 }
 
 const initialFilters: FilterState = {
@@ -54,8 +78,16 @@ export const useStore = create<UIState & UIActions>()(
       darkMode: false,
       sync: {
         isSyncing: false,
+        isSyncingFederal: false,
         lastSyncTime: null,
+        lastFederalSyncTime: null,
         totalBillsSynced: 0,
+        totalFederalBillsSynced: 0,
+      },
+      chat: {
+        isOpen: false,
+        messages: [],
+        attachments: [],
       },
 
       // Actions
@@ -68,11 +100,28 @@ export const useStore = create<UIState & UIActions>()(
           },
         })),
 
+      setSyncingFederal: (isSyncing: boolean) =>
+        set((state) => ({
+          sync: {
+            ...state.sync,
+            isSyncingFederal: isSyncing,
+            ...(isSyncing ? {} : { lastFederalSyncTime: new Date().toISOString() }),
+          },
+        })),
+
       updateSyncStats: (totalBills: number) =>
         set((state) => ({
           sync: {
             ...state.sync,
             totalBillsSynced: totalBills,
+          },
+        })),
+
+      updateFederalSyncStats: (totalBills: number) =>
+        set((state) => ({
+          sync: {
+            ...state.sync,
+            totalFederalBillsSynced: totalBills,
           },
         })),
 
@@ -100,6 +149,42 @@ export const useStore = create<UIState & UIActions>()(
 
       toggleDarkMode: () =>
         set((state) => ({ darkMode: !state.darkMode })),
+
+      // Chat actions
+      toggleChat: () =>
+        set((state) => ({
+          chat: { ...state.chat, isOpen: !state.chat.isOpen }
+        })),
+
+      setChatOpen: (open: boolean) =>
+        set((state) => ({
+          chat: { ...state.chat, isOpen: open }
+        })),
+
+      addMessage: (message) =>
+        set((state) => ({
+          chat: {
+            ...state.chat,
+            messages: [...state.chat.messages, message]
+          }
+        })),
+
+      addAttachment: (attachment) =>
+        set((state) => ({
+          chat: {
+            ...state.chat,
+            attachments: [...state.chat.attachments, attachment]
+          }
+        })),
+
+      clearChat: () =>
+        set((state) => ({
+          chat: {
+            ...state.chat,
+            messages: [],
+            attachments: []
+          }
+        })),
     }),
     {
       name: 'firetrack-storage',
@@ -130,5 +215,16 @@ export const useDarkMode = () => useStore((state) => ({
 export const useSync = () => useStore((state) => ({
   ...state.sync,
   setSyncing: state.setSyncing,
+  setSyncingFederal: state.setSyncingFederal,
   updateSyncStats: state.updateSyncStats,
+  updateFederalSyncStats: state.updateFederalSyncStats,
+}));
+
+export const useChat = () => useStore((state) => ({
+  ...state.chat,
+  toggle: state.toggleChat,
+  setOpen: state.setChatOpen,
+  addMessage: state.addMessage,
+  addAttachment: state.addAttachment,
+  clear: state.clearChat,
 }));

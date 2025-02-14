@@ -3,6 +3,7 @@ import "./globals.css";
 import { headers } from "next/headers";
 import { Providers } from "./providers";
 import { Navigation } from "./components/Navigation";
+import { ChatModal } from "./components/ChatModal";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -35,6 +36,7 @@ export default async function RootLayout({
                 {children}
               </div>
             </main>
+            <ChatModal />
           </div>
         </Providers>
       </body>

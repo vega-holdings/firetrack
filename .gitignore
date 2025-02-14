@@ -33,6 +33,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# uploads
+/public/uploads/*
+!/public/uploads/.gitkeep
+
 # database
 /prisma/dev.db
 /prisma/dev.db-journal

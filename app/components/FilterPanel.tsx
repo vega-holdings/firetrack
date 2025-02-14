@@ -3,6 +3,8 @@
 import { useFilters, useStore } from "@/lib/store";
 import { searchBills } from "@/lib/actions/bill-actions";
 import { useCallback } from "react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 // Mock data for states - in production, this would come from an API
 const STATES = [
@@ -58,30 +60,30 @@ export function FilterPanel() {
 
   return (
     <aside className="lg:col-span-1 space-y-6 bg-white p-6 rounded-lg shadow">
-      <h2 className="text-xl font-semibold">Filters</h2>
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Jurisdiction
-          </label>
-          <select
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            value={filters.jurisdiction || "all"}
-            onChange={(e) => handleFilterChange("jurisdiction", e.target.value)}
-          >
-            <option value="all">All Jurisdictions</option>
-            <option value="federal">Federal</option>
-            <option value="state">State</option>
-          </select>
+      <div className="flex items-center justify-between pb-4 border-b">
+        <h2 className="text-xl font-semibold">Filters</h2>
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="federal-toggle"
+            checked={filters.jurisdiction === "federal"}
+            onCheckedChange={(checked) => 
+              handleFilterChange("jurisdiction", checked ? "federal" : "all")
+            }
+          />
+          <Label htmlFor="federal-toggle" className="text-sm font-medium">
+            Federal Laws Only
+          </Label>
         </div>
+      </div>
+      <div className="space-y-4 pt-2">
         
         {filters.jurisdiction !== "federal" && (
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <Label className="text-sm font-medium">
               State
-            </label>
+            </Label>
             <select
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              className="mt-1 block w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               value={filters.state || ""}
               onChange={(e) => handleFilterChange("state", e.target.value)}
             >
@@ -96,11 +98,11 @@ export function FilterPanel() {
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">
+          <Label className="text-sm font-medium">
             Status
-          </label>
+          </Label>
           <select
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            className="mt-1 block w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             value={filters.status || ""}
             onChange={(e) => handleFilterChange("status", e.target.value)}
           >
@@ -114,12 +116,12 @@ export function FilterPanel() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">
+          <Label className="text-sm font-medium">
             Search
-          </label>
+          </Label>
           <input
             type="text"
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            className="mt-1 block w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             placeholder="Search bills..."
             value={filters.searchQuery}
             onChange={(e) => handleFilterChange("searchQuery", e.target.value)}

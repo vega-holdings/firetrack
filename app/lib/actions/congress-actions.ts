@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import axios from "axios";
-import { convertApiToPrisma } from "@/lib/types/bill";
+import { BillSponsorship } from "@/lib/types/bill";
+import { Prisma } from "@prisma/client";
 
 // Congress.gov API configuration
 const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
@@ -29,10 +30,45 @@ const congressApi = axios.create({
   }
 });
 
+type ActionCreateInput = Prisma.ActionCreateManyBillInput;
+
 // Process a single federal bill
 async function processFederalBill(bill: any) {
-  console.log(`[Sync] Federal: Processing bill ${bill.congress}-${bill.type}-${bill.number}...`);
+  try {
+    // Validate required fields
+    if (!bill.congress || !bill.type || !bill.number) {
+      console.error(`[Sync] Federal: Missing required fields:`, {
+        congress: bill.congress,
+        type: bill.type,
+        number: bill.number
+      });
+      return false;
+    }
+
+    console.log(`[Sync] Federal: Processing bill ${bill.congress}-${bill.type}-${bill.number}...`);
+    console.log(`[Sync] Federal: Raw bill data:`, JSON.stringify(bill, null, 2));
   
+  // Process subjects and extras
+  let subjects = null;
+  let extras: { subjectsUrl?: string; policyArea?: any } = {};
+
+  // Handle subjects
+  if (typeof bill.subjects === 'string' || bill.subjects?.url) {
+    // If subjects is a URL or string, store it in extras for future fetching
+    const subjectsInfo = typeof bill.subjects === 'string' ? bill.subjects : bill.subjects?.url;
+    extras.subjectsUrl = subjectsInfo;
+    console.log(`[Sync] Federal: Subjects URL stored in extras: ${subjectsInfo}`);
+  } else if (Array.isArray(bill.subjects)) {
+    // If subjects is already an array, use it directly
+    subjects = JSON.stringify(bill.subjects);
+    console.log(`[Sync] Federal: Using provided subjects array: ${subjects}`);
+  }
+
+  // Add policy area to extras if available
+  if (bill.policyArea) {
+    extras.policyArea = bill.policyArea;
+  }
+
   // Map Congress.gov bill data to our schema
   const billData = {
     id: `congress-${bill.congress}-${bill.type}-${bill.number}`,
@@ -40,8 +76,8 @@ async function processFederalBill(bill: any) {
     title: bill.title || bill.shortTitle,
     session: bill.congress?.toString(),
     classification: JSON.stringify(["federal", bill.type]),
-    subject: bill.subjects ? JSON.stringify(bill.subjects) : null,
-    extras: bill.policyArea ? JSON.stringify({ policyArea: bill.policyArea }) : null,
+    subject: subjects,
+    extras: Object.keys(extras).length > 0 ? JSON.stringify(extras) : null,
     openstates_url: null,
     first_action_date: bill.introducedDate ? new Date(bill.introducedDate) : null,
     latest_action_date: bill.latestAction?.actionDate ? new Date(bill.latestAction.actionDate) : null,
@@ -56,58 +92,107 @@ async function processFederalBill(bill: any) {
   };
 
   // Process sponsors
-  const sponsors = bill.sponsors?.map((sponsor: any) => ({
-    id: `congress-sponsor-${sponsor.bioguideId || sponsor.name}`,
-    name: sponsor.name,
-    primary: sponsor.sponsorType === "Primary",
-    classification: sponsor.sponsorType || null,
-    party: sponsor.party || null,
-    title: sponsor.role || null,
-  })) || [];
+  const sponsors: BillSponsorship[] = [];
+  if (bill.sponsors && Array.isArray(bill.sponsors)) {
+    console.log(`[Sync] Federal: Processing ${bill.sponsors.length} sponsors for bill ${billData.id}`);
+    for (const sponsor of bill.sponsors) {
+      console.log(`[Sync] Federal: Sponsor data:`, JSON.stringify(sponsor, null, 2));
+      // Only add sponsor if we have a name
+      if (sponsor.name || sponsor.fullName || sponsor.firstName) {
+        const sponsorName = sponsor.name || sponsor.fullName || 
+          (sponsor.firstName && sponsor.lastName ? `${sponsor.firstName} ${sponsor.lastName}` : "Unknown");
+        sponsors.push({
+          id: `congress-sponsor-${sponsor.bioguideId || sponsorName}`,
+          name: sponsorName,
+          primary: sponsor.sponsorType === "Primary",
+          classification: sponsor.sponsorType || null,
+          party: sponsor.party || null,
+          title: sponsor.role || null,
+        });
+        console.log(`[Sync] Federal: Added sponsor ${sponsorName}`);
+      } else {
+        console.log(`[Sync] Federal: Skipping sponsor due to missing name`);
+      }
+    }
+  } else {
+    console.log(`[Sync] Federal: No sponsors found for bill ${billData.id}`);
+  }
 
   // Process actions
-  const actions = bill.actions?.map((action: any, index: number) => ({
-    id: `congress-action-${billData.id}-${index}`,
-    description: action.text,
-    date: action.actionDate ? new Date(action.actionDate) : null,
-    classification: action.type ? JSON.stringify([action.type]) : null,
-    order: index,
-    organization_name: action.actionChamber || null,
-  })) || [];
+  const actions: ActionCreateInput[] = [];
+  if (bill.actions && Array.isArray(bill.actions)) {
+    for (let index = 0; index < bill.actions.length; index++) {
+      const action = bill.actions[index];
+      if (action.actionDate) { // Only add actions with valid dates
+        actions.push({
+          id: `congress-action-${billData.id}-${index}`,
+          description: action.text || action.description || '',
+          date: new Date(action.actionDate), // Convert to Date object
+          classification: action.type ? JSON.stringify([action.type]) : null,
+          order: index,
+          organization_name: action.actionChamber || null,
+        });
+      }
+    }
+  }
 
-  try {
-    console.log(`[Sync] Federal: Saving bill ${billData.id} to database...`);
+    try {
+      console.log(`[Sync] Federal: Saving bill ${billData.id} to database...`);
+    console.log(`[Sync] Federal: Processed bill data:`, JSON.stringify({
+      billData,
+      sponsorsCount: sponsors.length,
+      actionsCount: actions.length
+    }, null, 2));
     
     // Use a transaction to ensure atomic operations
-    return await db.$transaction(async (prisma) => {
-      await prisma.bill.upsert({
+      return await db.$transaction(async (prisma) => {
+      // First, try to find the existing bill
+      const existingBill = await prisma.bill.findUnique({
         where: { id: billData.id },
-        update: {
-          ...billData,
-          actions: {
-            deleteMany: {},
-            createMany: { data: actions }
-          },
-          sponsors: {
-            deleteMany: {},
-            createMany: { data: sponsors }
-          }
-        },
-        create: {
-          ...billData,
-          actions: {
-            createMany: { data: actions }
-          },
-          sponsors: {
-            createMany: { data: sponsors }
-          }
-        }
+        include: { actions: true, sponsors: true }
       });
 
-      return true;
-    });
+      if (existingBill) {
+        // Update existing bill
+        await prisma.bill.update({
+          where: { id: billData.id },
+          data: {
+            ...billData,
+            actions: {
+              deleteMany: {},
+              createMany: { data: actions }
+            },
+            sponsors: {
+              deleteMany: {},
+              createMany: { data: sponsors }
+            }
+          }
+        });
+        console.log(`[Sync] Federal: Updated existing bill ${billData.id}`);
+      } else {
+        // Create new bill
+        await prisma.bill.create({
+          data: {
+            ...billData,
+            actions: {
+              create: actions
+            },
+            sponsors: {
+              create: sponsors
+            }
+          }
+        });
+        console.log(`[Sync] Federal: Created new bill ${billData.id}`);
+      }
+
+        return true;
+      });
+    } catch (error) {
+      console.error(`[Sync] Federal: Error saving bill ${billData.id}:`, error);
+      return false;
+    }
   } catch (error) {
-    console.error(`[Sync] Federal: Error saving bill ${billData.id}:`, error);
+    console.error(`[Sync] Federal: Error processing bill:`, error);
     return false;
   }
 }
@@ -146,9 +231,17 @@ async function fetchFromCongressAPI(congress: number = 118) {
 
         for (const bill of bills) {
           // Fetch detailed bill data
+          console.log(`[Sync] Federal: Fetching details for bill ${bill.congress}-${bill.type}-${bill.number}...`);
           const detailResponse = await congressApi.get(
             `/bill/${bill.congress}/${bill.type}/${bill.number}`
           );
+          
+          if (!detailResponse.data?.bill) {
+            console.error(`[Sync] Federal: No bill data in detail response for ${bill.congress}-${bill.type}-${bill.number}`);
+            continue;
+          }
+
+          console.log(`[Sync] Federal: Got detail response for ${bill.congress}-${bill.type}-${bill.number}`);
           const success = await processFederalBill(detailResponse.data.bill);
           if (success) successfulSaves++;
           totalProcessed++;
