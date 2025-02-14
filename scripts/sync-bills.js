@@ -1,8 +1,8 @@
-import axios from 'axios';
-import { PrismaClient } from '@prisma/client';
-import dotenv from 'dotenv';
-import fs from 'fs/promises';
-import path from 'path';
+const axios = require('axios');
+const { PrismaClient } = require('@prisma/client');
+const dotenv = require('dotenv');
+const fs = require('fs').promises;
+const path = require('path');
 
 dotenv.config();
 
@@ -85,7 +85,7 @@ async function main() {
           params.append('q', 'firearm');
           params.append('sort', 'updated_desc');
           params.append('page', page.toString());
-          params.append('per_page', '20');
+          params.append('per_page', '1');
           ['sponsorships', 'abstracts', 'other_titles', 'other_identifiers', 
            'actions', 'sources', 'documents', 'versions', 'votes'].forEach(item => {
             params.append('include', item);
@@ -103,27 +103,109 @@ async function main() {
               }
               if (syncState.lastProcessedBill) continue;
 
-              await retryWithBackoff(async () => {
-                // Process bill (using the same logic as before)
-                const documents = bill.documents?.map(doc => ({
-                  id: doc.id,
-                  note: doc.note || null,
-                  date: doc.date ? new Date(doc.date) : null,
-                  links: doc.links ? JSON.stringify(doc.links) : null
-                })) || [];
+              // Process bill data
+              const documents = bill.documents?.map(doc => ({
+                id: doc.id,
+                note: doc.note || null,
+                date: doc.date ? new Date(doc.date) : null,
+                links: doc.links ? JSON.stringify(doc.links) : null
+              })) || [];
 
-                const versions = bill.versions?.map(ver => ({
-                  id: ver.id,
-                  note: ver.note || null,
-                  date: ver.date ? new Date(ver.date) : null,
-                  links: ver.links ? JSON.stringify(ver.links) : null
-                })) || [];
+              const versions = bill.versions?.map(ver => ({
+                id: ver.id,
+                note: ver.note || null,
+                date: ver.date ? new Date(ver.date) : null,
+                links: ver.links ? JSON.stringify(ver.links) : null
+              })) || [];
 
+              const sources = bill.sources?.map((source, index) => ({
+                url: source.url,
+                note: source.note || null,
+              })) || [];
+
+              const abstracts = bill.abstracts?.map((abstract, index) => ({
+                abstract: abstract.abstract,
+                note: abstract.note || null,
+              })) || [];
+
+              const otherTitles = bill.other_titles?.map((title, index) => ({
+                title: title.title,
+                note: title.note || null,
+              })) || [];
+
+              const otherIdentifiers = bill.other_identifiers?.map((identifier, index) => ({
+                identifier: identifier.identifier,
+              })) || [];
+
+              const actions = bill.actions?.map(action => ({
+                id: action.id,
+                description: action.description,
+                date: action.date ? new Date(action.date) : null,
+                classification: action.classification ? JSON.stringify(action.classification) : null,
+                order: action.order || 0,
+                organization_name: action.organization?.name || null,
+              })) || [];
+
+              const sponsors = bill.sponsorships?.map(sponsor => ({
+                name: sponsor.name,
+                primary: sponsor.primary || false,
+                classification: sponsor.classification || null,
+              })) || [];
+
+              const votes = bill.votes?.map(vote => ({
+                id: vote.id,
+                identifier: vote.id,
+                motion_text: vote.motion_text || "Vote",
+                start_date: vote.start_date ? new Date(vote.start_date) : new Date(),
+                result: vote.result || "unknown",
+                counts: {
+                  createMany: {
+                    data: vote.counts?.map(count => ({
+                      option: count.option,
+                      value: count.value
+                    })) || []
+                  }
+                },
+                votes: {
+                  createMany: {
+                    data: vote.votes?.map(v => ({
+                      option: v.option,
+                      voter_name: v.voter_name,
+                      voter_id: v.voter_id || null,
+                      voter_party: v.voter_party || null
+                    })) || []
+                  }
+                }
+              })) || [];
+
+              const billData = {
+                id: bill.id,
+                identifier: bill.identifier,
+                title: bill.title || null,
+                session: bill.session || null,
+                classification: bill.classification ? JSON.stringify(bill.classification) : null,
+                subject: bill.subject ? JSON.stringify(bill.subject) : null,
+                extras: bill.extras ? JSON.stringify(bill.extras) : null,
+                openstates_url: bill.openstates_url || null,
+                first_action_date: bill.first_action_date ? new Date(bill.first_action_date) : null,
+                latest_action_date: bill.latest_action_date ? new Date(bill.latest_action_date) : null,
+                latest_action_description: bill.latest_action_description || null,
+                latest_passage_date: bill.latest_passage_date ? new Date(bill.latest_passage_date) : null,
+                jurisdiction_id: bill.jurisdiction?.id || null,
+                jurisdiction_name: bill.jurisdiction?.name || null,
+                jurisdiction_classification: bill.jurisdiction?.classification || null,
+                from_organization_id: bill.from_organization?.id || null,
+                from_organization_name: bill.from_organization?.name || null,
+                from_organization_classification: bill.from_organization?.classification || null,
+                created_at: new Date(),
+                updated_at: new Date()
+              };
+
+              try {
                 await prisma.bill.upsert({
                   where: { id: bill.id },
                   update: {
-                    identifier: bill.identifier,
-                    title: bill.title || null,
+                    ...billData,
                     documents: {
                       deleteMany: {},
                       createMany: { data: documents }
@@ -131,33 +213,103 @@ async function main() {
                     versions: {
                       deleteMany: {},
                       createMany: { data: versions }
+                    },
+                    sources: {
+                      deleteMany: {},
+                      createMany: { data: sources }
+                    },
+                    abstracts: {
+                      deleteMany: {},
+                      createMany: { data: abstracts }
+                    },
+                    other_titles: {
+                      deleteMany: {},
+                      createMany: { data: otherTitles }
+                    },
+                    other_identifiers: {
+                      deleteMany: {},
+                      createMany: { data: otherIdentifiers }
+                    },
+                    actions: {
+                      deleteMany: {},
+                      createMany: { data: actions }
+                    },
+                    sponsors: {
+                      deleteMany: {},
+                      createMany: { data: sponsors }
+                    },
+                    votes: {
+                      deleteMany: {},
+                      create: votes
                     }
                   },
                   create: {
-                    id: bill.id,
-                    identifier: bill.identifier,
-                    title: bill.title || null,
+                    ...billData,
                     documents: {
                       createMany: { data: documents }
                     },
                     versions: {
                       createMany: { data: versions }
+                    },
+                    sources: {
+                      createMany: { data: sources }
+                    },
+                    abstracts: {
+                      createMany: { data: abstracts }
+                    },
+                    other_titles: {
+                      createMany: { data: otherTitles }
+                    },
+                    other_identifiers: {
+                      createMany: { data: otherIdentifiers }
+                    },
+                    actions: {
+                      createMany: { data: actions }
+                    },
+                    sponsors: {
+                      createMany: { data: sponsors }
+                    },
+                    votes: {
+                      create: votes
                     }
                   }
                 });
-              });
 
-              processedBills++;
-              // Save progress after each bill
-              await saveSyncState({
-                ...syncState,
-                lastSuccessfulSync: new Date().toISOString(),
-                lastProcessedBill: bill.id,
-              });
-
+                processedBills++;
+                
+                // Save progress after each bill
+                await saveSyncState({
+                  ...syncState,
+                  lastSuccessfulSync: new Date().toISOString(),
+                  lastProcessedBill: bill.id,
+                });
+              } catch (error) {
+                console.error(`Error processing bill ${bill.id}:`, {
+                  message: error.message,
+                  details: error.stack,
+                  code: error.code,
+                  meta: error.meta,
+                  validationError: error.name === 'PrismaClientValidationError' ? {
+                    name: error.name,
+                    message: error.message,
+                    details: JSON.stringify(error, null, 2)
+                  } : undefined
+                });
+                throw error; // Let the outer catch handle state updates
+              }
             } catch (error) {
               // Log error but continue with next bill
-              console.error(`Error processing bill ${bill.id}:`, error);
+              console.error(`Error processing bill ${bill.id}:`, {
+                message: error.message,
+                details: error.stack,
+                code: error.code,
+                meta: error.meta,
+                validationError: error.name === 'PrismaClientValidationError' ? {
+                  name: error.name,
+                  message: error.message,
+                  details: JSON.stringify(error, null, 2)
+                } : undefined
+              });
               syncState.errors.push({
                 billId: bill.id,
                 error: error.message,
@@ -208,3 +360,10 @@ async function main() {
     await prisma.$disconnect();
   }
 }
+
+// Run the sync process
+if (require.main === module) {
+  main().catch(console.error);
+}
+
+module.exports = { main };

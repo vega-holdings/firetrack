@@ -1,0 +1,3995 @@
+==> app/api/auth/[...nextauth]/route.ts <==
+// Auth routes disabled for MVP
+/*
+import { GET, POST } from "@/auth";
+
+export { GET, POST };
+*/
+
+==> app/auth.ts <==
+// Auth configuration disabled for MVP
+/*
+import NextAuth from "next-auth";
+import { type DefaultSession } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+
+// Extend the built-in session type
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+    } & DefaultSession["user"];
+  }
+}
+
+export const {
+  handlers: { GET, POST },
+  auth,
+  signIn,
+  signOut,
+} = NextAuth({
+  providers: [
+    // For MVP, we'll use a simple credentials provider
+    // In production, you might want to use OAuth providers
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        username: { label: "Username", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        // This is a mock authentication
+        // In production, validate against your user database
+        if (
+          credentials?.username === "admin" &&
+          credentials?.password === "password"
+        ) {
+          return {
+            id: "1",
+            name: "Admin User",
+            email: "admin@example.com",
+          };
+        }
+        return null;
+      },
+    }),
+  ],
+  pages: {
+    signIn: "/auth/signin",
+  },
+  callbacks: {
+    async session({ session, token }) {
+      if (token.sub && session.user) {
+        session.user.id = token.sub;
+      }
+      return session;
+    },
+    async jwt({ token, user }) {
+      if (user) {
+        token.sub = user.id;
+      }
+      return token;
+    },
+  },
+});
+*/
+
+// Temporary mock auth functions for MVP
+export const auth = async () => null;
+export const signIn = async () => null;
+export const signOut = async () => null;
+
+==> app/auth/signin/page.tsx <==
+// Auth disabled for MVP
+export default function SignIn() {
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="w-full max-w-md space-y-8 p-8">
+        <div className="text-center">
+          <h2 className="mt-6 text-3xl font-bold tracking-tight">
+            Authentication Disabled
+          </h2>
+          <p className="mt-4 text-gray-600">
+            Authentication is disabled for the MVP version.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+==> app/bills/[id]/loading.tsx <==
+export default function Loading() {
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow p-6 animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/4 mb-8"></div>
+          <div className="space-y-4">
+            <div className="h-4 bg-gray-200 rounded w-full"></div>
+            <div className="h-4 bg-gray-200 rounded w-full"></div>
+            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+==> app/bills/[id]/page.tsx <==
+import { getBillById } from "@/lib/actions/bill-actions";
+import { formatDate } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { notFound } from "next/navigation";
+
+export default async function BillPage({ params }: { params: { id: string } }) {
+  // Add 'ocd-bill/' prefix back for database lookup
+  const result = await getBillById(`ocd-bill/${params.id}`);
+
+  if (!result.success || !result.data) {
+    notFound();
+  }
+
+  const { bill } = result.data;
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-start">
+              <div>
+                <CardTitle className="text-2xl">{bill.identifier}</CardTitle>
+                <p className="text-muted-foreground mt-2">
+                  {bill.jurisdiction_name}
+                </p>
+              </div>
+              {bill.latest_action_date && (
+                <span className="text-sm text-muted-foreground">
+                  Last Updated: {formatDate(bill.latest_action_date)}
+                </span>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Basic Information */}
+            <div>
+              <h3 className="font-semibold mb-2">Title</h3>
+              <p>{bill.title}</p>
+            </div>
+
+            {/* Session Info */}
+            <div>
+              <h3 className="font-semibold mb-2">Session Information</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Session</p>
+                  <p>{bill.session}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Classification</p>
+                  <div className="flex flex-wrap gap-1">
+                    {bill.classification?.map((cls) => (
+                      <span
+                        key={cls}
+                        className="inline-flex items-center rounded-full bg-secondary/50 px-2 py-0.5 text-xs"
+                      >
+                        {cls}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Subjects */}
+            {bill.subject && bill.subject.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-2">Subjects</h3>
+                <div className="flex flex-wrap gap-2">
+                  {bill.subject.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Organization Info */}
+            <div>
+              <h3 className="font-semibold mb-2">Organization</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Name</p>
+                  <p>{bill.from_organization_name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Classification</p>
+                  <p>{bill.from_organization_classification}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Latest Action */}
+            {bill.latest_action_description && (
+              <div>
+                <h3 className="font-semibold mb-2">Latest Action</h3>
+                <div className="bg-muted/50 rounded-lg p-4">
+                  {bill.latest_action_date && (
+                    <p className="text-sm text-muted-foreground mb-1">
+                      {formatDate(bill.latest_action_date)}
+                    </p>
+                  )}
+                  <p>{bill.latest_action_description}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Action History */}
+            {bill.actions && bill.actions.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-2">History</h3>
+                <div className="space-y-4">
+                  {bill.actions.map((action) => (
+                    <div key={action.id} className="border-l-2 pl-4">
+                      <p className="text-sm text-muted-foreground">
+                        {formatDate(action.date)}
+                      </p>
+                      <p>{action.description}</p>
+                      {action.classification && action.classification.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {action.classification.map((cls) => (
+                            <span
+                              key={cls}
+                              className="inline-flex items-center rounded-full bg-secondary/50 px-2 py-0.5 text-xs"
+                            >
+                              {cls}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Sponsors */}
+            {bill.sponsors && bill.sponsors.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-2">Sponsors</h3>
+                <div className="grid gap-2">
+                  {bill.sponsors.map((sponsor) => (
+                    <div key={sponsor.id} className="flex items-center gap-2">
+                      <span className="text-sm">{sponsor.name}</span>
+                      {sponsor.primary && (
+                        <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
+                          Primary
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Documents */}
+            {bill.documents && bill.documents.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-2">Documents</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {bill.documents.map((doc) => (
+                    <div key={doc.id} className="bg-muted/50 rounded-lg p-4">
+                      <div className="flex flex-col gap-2">
+                        <p className="font-medium">{doc.note || "Document"}</p>
+                        {doc.links && doc.links.map((link, idx) => (
+                          <a
+                            key={idx}
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline text-sm"
+                          >
+                            {link.media_type || 'View Document'}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Versions */}
+            {bill.versions && bill.versions.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-2">Versions</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {bill.versions.map((ver) => (
+                    <div key={ver.id} className="bg-muted/50 rounded-lg p-4">
+                      <div className="flex flex-col gap-2">
+                        <p className="font-medium">{ver.note || "Version"}</p>
+                        {ver.links && ver.links.map((link, idx) => (
+                          <a
+                            key={idx}
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline text-sm"
+                          >
+                            {link.media_type || 'View Version'}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Votes */}
+            {bill.votes && bill.votes.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-2">Votes</h3>
+                <div className="space-y-4">
+                  {bill.votes.map((vote) => (
+                    <div key={vote.id} className="bg-muted/50 rounded-lg p-4">
+                      <div className="space-y-2">
+                        <p className="font-medium">{vote.motion_text || "Vote"}</p>
+                        <div className="grid grid-cols-3 gap-4">
+                          {vote.counts.map((count) => (
+                            <div key={count.option} className="text-center">
+                              <p className="text-sm text-muted-foreground">{count.option}</p>
+                              <p className="font-medium">{count.value}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Comments */}
+            {bill.comments && bill.comments.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-2">Comments</h3>
+                <div className="space-y-4">
+                  {bill.comments.map((comment) => (
+                    <div key={comment.id} className="bg-muted/50 rounded-lg p-4">
+                      <p>{comment.text}</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {formatDate(comment.created_at)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Annotations */}
+            {bill.annotations && bill.annotations.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-2">Annotations</h3>
+                <div className="space-y-4">
+                  {bill.annotations.map((annotation) => (
+                    <div key={annotation.id} className="bg-muted/50 rounded-lg p-4">
+                      <p>{annotation.text}</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {formatDate(annotation.created_at)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+==> app/components/BillCard.tsx <==
+"use client";
+
+import { type Bill, parseJsonField } from "@/lib/types/bill";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { formatDate, cleanBillId } from "@/lib/utils";
+import Link from "next/link";
+
+interface BillCardProps {
+  bill: Bill;
+}
+
+export function BillCard({ bill }: BillCardProps) {
+  return (
+    <Card className="hover:bg-accent/5 transition-colors h-[320px] flex flex-col">
+      <CardHeader>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle className="text-lg">{bill.identifier}</CardTitle>
+            <CardDescription className="mt-2">
+              {bill.jurisdiction_name}
+            </CardDescription>
+          </div>
+          {bill.latest_action_date && (
+            <span className="text-sm text-muted-foreground">
+              {formatDate(bill.latest_action_date)}
+            </span>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="flex-1 overflow-hidden space-y-4">
+        {/* Title */}
+        <div>
+          <p className="text-sm line-clamp-3">
+            {bill.title || "No title available"}
+          </p>
+        </div>
+        {/* Latest Action */}
+        {bill.latest_action_description && (
+          <div>
+            <p className="text-sm font-medium mb-1">Latest Action:</p>
+            <p className="text-sm line-clamp-2 text-muted-foreground">
+              {bill.latest_action_description}
+            </p>
+          </div>
+        )}
+      </CardContent>
+      <CardFooter>
+        <div className="flex justify-end w-full space-x-2">
+          <Button variant="outline" asChild>
+            <Link href={`/bills/${cleanBillId(bill.id)}`}>View Details</Link>
+          </Button>
+          <Button variant="secondary">
+            Track
+          </Button>
+        </div>
+      </CardFooter>
+    </Card>
+  );
+}
+
+==> app/components/BillsList.tsx <==
+"use client";
+
+import { useEffect, useState, useRef, useCallback } from "react";
+import { useFilters, useStore } from "@/lib/store/index";
+import { searchBills } from "@/lib/actions/bill-actions";
+import { BillCard } from "./BillCard";
+import { Button } from "./ui/button";
+import { cleanBillId } from "@/lib/utils";
+
+interface BillsListProps {
+  initialBills: Awaited<ReturnType<typeof searchBills>>;
+}
+
+export function BillsList({ initialBills }: BillsListProps) {
+  const [bills, setBills] = useState(initialBills.data?.bills || []);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalBills, setTotalBills] = useState(initialBills.data?.pagination?.total || 0);
+  const [stateClickCount, setStateClickCount] = useState(0);
+  const observer = useRef<IntersectionObserver>();
+  const lastBillElementRef = useCallback((node: HTMLDivElement) => {
+    if (loading) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        setPage(prev => prev + 1);
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [loading, hasMore]);
+  const filters = useFilters();
+  const setFilter = useStore((state) => state.setFilter);
+
+  // Reset to page 1 when component mounts
+  useEffect(() => {
+    setFilter("page", 1);
+  }, [setFilter]);
+
+  // Load bills when filters or page changes
+  useEffect(() => {
+    const loadBills = async () => {
+      setLoading(true);
+      const formData = new FormData();
+      if (filters.state) formData.append("state", filters.state);
+      if (filters.status) formData.append("status", filters.status);
+      if (filters.searchQuery) formData.append("query", filters.searchQuery);
+      formData.append("page", page.toString());
+      formData.append("limit", "20");
+
+      const result = await searchBills(formData);
+      if (result.success && result.data?.bills) {
+        const { bills, pagination } = result.data;
+        
+        if (page === 1) {
+          setBills(bills);
+          setTotalBills(pagination?.total || 0);
+        } else {
+          setBills(prev => [...prev, ...bills]);
+        }
+
+        setHasMore(page < (pagination?.pages || 1));
+      } else {
+        setHasMore(false);
+      }
+      setLoading(false);
+    };
+
+    loadBills();
+  }, [page, filters.state, filters.status, filters.searchQuery]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setPage(1);
+    setStateClickCount(0);
+  }, [filters.state, filters.status, filters.searchQuery]);
+
+  // Calculate displayed bills
+  const displayedBills = filters.state ? 
+    bills.slice(0, Math.min(bills.length, (stateClickCount + 1) * 10)) : 
+    bills;
+
+  const handleStateClick = useCallback(() => {
+    if (filters.state) {
+      setStateClickCount(prev => prev + 1);
+    }
+  }, [filters.state]);
+
+  useEffect(() => {
+    // Listen for state map clicks
+    window.addEventListener('stateClick', handleStateClick);
+    return () => window.removeEventListener('stateClick', handleStateClick);
+  }, [handleStateClick]);
+
+  if (!bills.length) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground">No bills found</p>
+      </div>
+    );
+  }
+
+  const stateCount = filters.state ? 
+    bills.filter(bill => bill.jurisdiction_name === filters.state).length : 
+    null;
+
+  return (
+    <>
+      <div className="mb-4 text-sm text-muted-foreground">
+        <span>Total Bills: {totalBills}</span>
+        {stateCount !== null && (
+          <span className="ml-4">Bills in {filters.state}: {stateCount}</span>
+        )}
+      </div>
+      <div className="space-y-8">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {displayedBills.map((bill, index) => {
+          const id = cleanBillId(bill.id);
+          return (
+            <div
+              key={`${id}-${index}`}
+              ref={index === bills.length - 1 ? lastBillElementRef : undefined}
+            >
+              <BillCard bill={bill} />
+            </div>
+          );
+        })}
+      </div>
+      {loading && (
+        <div className="text-center py-4">
+          <p className="text-muted-foreground">Loading more bills...</p>
+        </div>
+      )}
+      {filters.state && bills.length > displayedBills.length && (
+        <div className="text-center py-4">
+          <Button 
+            onClick={handleStateClick}
+            variant="outline"
+          >
+            Show More Bills from {filters.state}
+          </Button>
+        </div>
+      )}
+      </div>
+    </>
+  );
+}
+
+==> app/components/FilterMenu.tsx <==
+"use client";
+
+import { Menu } from "lucide-react";
+import { FilterPanel } from "./FilterPanel";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
+export function FilterMenu() {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className="rounded-md p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+          aria-label="Open filters"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80">
+        <h3 className="font-semibold mb-4">Filters</h3>
+        <FilterPanel />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+==> app/components/FilterPanel.tsx <==
+"use client";
+
+import { useFilters, useStore } from "@/lib/store";
+import { searchBills } from "@/lib/actions/bill-actions";
+import { useCallback } from "react";
+
+// Mock data for states - in production, this would come from an API
+const STATES = [
+  "Alabama", "Alaska", "Arizona", "Arkansas", "California",
+  "Colorado", "Connecticut", "Delaware", "Florida", "Georgia",
+  "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa",
+  "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland",
+  "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri",
+  "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey",
+  "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio",
+  "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina",
+  "South Dakota", "Tennessee", "Texas", "Utah", "Vermont",
+  "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"
+];
+
+const STATUSES = [
+  "Introduced",
+  "In Committee",
+  "Passed Committee",
+  "Failed Committee",
+  "Passed House",
+  "Passed Senate",
+  "Failed House",
+  "Failed Senate",
+  "Signed",
+  "Vetoed"
+];
+
+export function FilterPanel() {
+  const filters = useFilters();
+  const { setFilter } = useStore();
+
+  const handleFilterChange = useCallback(async (key: string, value: string) => {
+    setFilter(key as keyof typeof filters, value || null);
+    
+    // Create FormData with current filters
+    const formData = new FormData();
+    formData.append("state", value || "");
+    formData.append("status", filters.status || "");
+    formData.append("query", filters.searchQuery || "");
+    formData.append("page", "1");
+    formData.append("limit", filters.limit.toString());
+
+    // Trigger search
+    await searchBills(formData);
+  }, [filters, setFilter]);
+
+  return (
+    <aside className="lg:col-span-1 space-y-6 bg-white p-6 rounded-lg shadow">
+      <h2 className="text-xl font-semibold">Filters</h2>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            State
+          </label>
+          <select
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            value={filters.state || ""}
+            onChange={(e) => handleFilterChange("state", e.target.value)}
+          >
+            <option value="">All States</option>
+            {STATES.map((state) => (
+              <option key={state} value={state}>
+                {state}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Status
+          </label>
+          <select
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            value={filters.status || ""}
+            onChange={(e) => handleFilterChange("status", e.target.value)}
+          >
+            <option value="">All Statuses</option>
+            {STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Search
+          </label>
+          <input
+            type="text"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            placeholder="Search bills..."
+            value={filters.searchQuery}
+            onChange={(e) => handleFilterChange("searchQuery", e.target.value)}
+          />
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+==> app/components/Navigation.tsx <==
+"use client";
+
+import { useDarkMode } from "@/lib/store/index";
+import { Moon, Sun, Settings } from "lucide-react";
+import Link from "next/link";
+
+export function Navigation() {
+  const { darkMode, toggle } = useDarkMode();
+
+  return (
+    <nav className="border-b bg-background">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 justify-between">
+          <div className="flex">
+            <div className="flex flex-shrink-0 items-center">
+              <Link href="/" className="text-xl font-bold hover:text-primary">
+                Firearms Legislation Tracker
+              </Link>
+            </div>
+          </div>
+          <div className="flex items-center space-x-4">
+            {/* Settings */}
+            <Link
+              href="/settings"
+              className="rounded-md p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+              aria-label="Settings"
+            >
+              <Settings className="h-5 w-5" />
+            </Link>
+
+            {/* Dark mode toggle */}
+            <button
+              onClick={toggle}
+              className="rounded-md p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+              aria-label="Toggle dark mode"
+            >
+              {darkMode ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+==> app/components/StateMap.tsx <==
+"use client";
+
+import USAMap from "react-usa-map";
+import { useStore } from "@/lib/store";
+
+export function StateMap() {
+  const { state, setFilter, resetFilters } = useStore((state) => ({
+    state: state.filters.state,
+    setFilter: state.setFilter,
+    resetFilters: state.resetFilters,
+  }));
+
+  // Map state codes to full names for filtering
+  const stateNames: { [key: string]: string } = {
+    AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
+    CO: "Colorado", CT: "Connecticut", DE: "Delaware", FL: "Florida", GA: "Georgia",
+    HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana", IA: "Iowa",
+    KS: "Kansas", KY: "Kentucky", LA: "Louisiana", ME: "Maine", MD: "Maryland",
+    MA: "Massachusetts", MI: "Michigan", MN: "Minnesota", MS: "Mississippi", MO: "Missouri",
+    MT: "Montana", NE: "Nebraska", NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey",
+    NM: "New Mexico", NY: "New York", NC: "North Carolina", ND: "North Dakota", OH: "Ohio",
+    OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island", SC: "South Carolina",
+    SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont",
+    VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming"
+  };
+
+  const handleStateClick = (event: { target: { dataset: { name: string } } }) => {
+    const stateCode = event.target.dataset.name;
+    const stateName = stateNames[stateCode];
+    if (stateName) {
+      setFilter("state", stateName);
+    }
+  };
+
+  const mapConfig = {
+    defaultFill: "#DCDCDC",
+    customize: {
+      ...(state ? {
+        [Object.entries(stateNames).find(([_, name]) => name === state)?.[0] || '']: {
+          fill: "#3b82f6"
+        }
+      } : {})
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <p className="text-sm text-muted-foreground">
+          {state ? `Showing bills from ${state}` : "Click a state to filter bills"}
+        </p>
+        {state && (
+          <button
+            onClick={() => resetFilters()}
+            className="text-sm text-blue-600 hover:text-blue-800"
+          >
+            Clear Selection
+          </button>
+        )}
+      </div>
+      <div className="w-full h-[550px] flex justify-center">
+        <style jsx global>{`
+          path {
+            pointer-events: all;
+            transition: fill 0.2s;
+          }
+          path:hover {
+            fill: #94a3b8 !important;
+            cursor: pointer;
+          }
+        `}</style>
+        <USAMap
+          onClick={handleStateClick}
+          defaultFill={mapConfig.defaultFill}
+          customize={mapConfig.customize}
+        />
+      </div>
+    </div>
+  );
+}
+
+==> app/components/SyncButton.tsx <==
+"use client";
+
+import { syncBillsFromAPI } from "@/lib/actions/bill-actions";
+import { useSync } from "@/lib/store";
+
+export function SyncButton() {
+  const { isSyncing, setSyncing, updateSyncStats } = useSync();
+
+  const handleSync = async () => {
+    if (isSyncing) return;
+    setSyncing(true);
+    try {
+      const result = await syncBillsFromAPI();
+      if (result.success) {
+        updateSyncStats(result.data?.totalSynced || 0);
+      }
+    } catch (error) {
+      console.error("Failed to sync bills:", error);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  return (
+    <button
+      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+      onClick={handleSync}
+      disabled={isSyncing}
+    >
+      {isSyncing ? "Syncing..." : "Sync Bills"}
+    </button>
+  );
+}
+
+==> app/components/ui/button.tsx <==
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/lib/utils";
+
+const buttonVariants = cva(
+  "inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        destructive:
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        outline:
+          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        secondary:
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+      size: {
+        default: "h-10 px-4 py-2",
+        sm: "h-9 rounded-md px-3",
+        lg: "h-11 rounded-md px-8",
+        icon: "h-10 w-10",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+);
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button";
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        {...props}
+      />
+    );
+  }
+);
+Button.displayName = "Button";
+
+export { Button, buttonVariants };
+
+==> app/components/ui/card.tsx <==
+import * as React from "react";
+import { cn } from "@/lib/utils";
+
+const Card = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn(
+      "rounded-lg border bg-card text-card-foreground shadow-sm",
+      className
+    )}
+    {...props}
+  />
+));
+Card.displayName = "Card";
+
+const CardHeader = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("flex flex-col space-y-1.5 p-6", className)}
+    {...props}
+  />
+));
+CardHeader.displayName = "CardHeader";
+
+const CardTitle = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLHeadingElement>
+>(({ className, ...props }, ref) => (
+  <h3
+    ref={ref}
+    className={cn(
+      "text-2xl font-semibold leading-none tracking-tight",
+      className
+    )}
+    {...props}
+  />
+));
+CardTitle.displayName = "CardTitle";
+
+const CardDescription = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLParagraphElement>
+>(({ className, ...props }, ref) => (
+  <p
+    ref={ref}
+    className={cn("text-sm text-muted-foreground", className)}
+    {...props}
+  />
+));
+CardDescription.displayName = "CardDescription";
+
+const CardContent = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
+));
+CardContent.displayName = "CardContent";
+
+const CardFooter = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("flex items-center p-6 pt-0", className)}
+    {...props}
+  />
+));
+CardFooter.displayName = "CardFooter";
+
+export {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardDescription,
+  CardContent,
+};
+
+==> app/components/ui/popover.tsx <==
+"use client"
+
+import * as React from "react"
+import * as PopoverPrimitive from "@radix-ui/react-popover"
+
+import { cn } from "@/lib/utils"
+
+const Popover = PopoverPrimitive.Root
+
+const PopoverTrigger = PopoverPrimitive.Trigger
+
+const PopoverContent = React.forwardRef<
+  React.ElementRef<typeof PopoverPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
+>(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
+  <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Content
+      ref={ref}
+      align={align}
+      sideOffset={sideOffset}
+      className={cn(
+        "z-50 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+        className
+      )}
+      {...props}
+    />
+  </PopoverPrimitive.Portal>
+))
+PopoverContent.displayName = PopoverPrimitive.Content.displayName
+
+export { Popover, PopoverTrigger, PopoverContent }
+
+==> app/components/ui/sheet.tsx <==
+"use client"
+
+import * as React from "react"
+import * as SheetPrimitive from "@radix-ui/react-dialog"
+import { cva, type VariantProps } from "class-variance-authority"
+import { X } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+
+const Sheet = SheetPrimitive.Root
+
+const SheetTrigger = SheetPrimitive.Trigger
+
+const SheetClose = SheetPrimitive.Close
+
+const SheetPortal = SheetPrimitive.Portal
+
+const SheetOverlay = React.forwardRef<
+  React.ElementRef<typeof SheetPrimitive.Overlay>,
+  React.ComponentPropsWithoutRef<typeof SheetPrimitive.Overlay>
+>(({ className, ...props }, ref) => (
+  <SheetPrimitive.Overlay
+    className={cn(
+      "fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      className
+    )}
+    {...props}
+    ref={ref}
+  />
+))
+SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
+
+const sheetVariants = cva(
+  "fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
+  {
+    variants: {
+      side: {
+        top: "inset-x-0 top-0 border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
+        bottom:
+          "inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+        left: "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm",
+        right:
+          "inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
+      },
+    },
+    defaultVariants: {
+      side: "right",
+    },
+  }
+)
+
+interface SheetContentProps
+  extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
+    VariantProps<typeof sheetVariants> {}
+
+const SheetContent = React.forwardRef<
+  React.ElementRef<typeof SheetPrimitive.Content>,
+  SheetContentProps
+>(({ side = "right", className, children, ...props }, ref) => (
+  <SheetPortal>
+    <SheetOverlay />
+    <SheetPrimitive.Content
+      ref={ref}
+      className={cn(sheetVariants({ side }), className)}
+      {...props}
+    >
+      {children}
+      <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
+        <X className="h-4 w-4" />
+        <span className="sr-only">Close</span>
+      </SheetPrimitive.Close>
+    </SheetPrimitive.Content>
+  </SheetPortal>
+))
+SheetContent.displayName = SheetPrimitive.Content.displayName
+
+const SheetHeader = ({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) => (
+  <div
+    className={cn(
+      "flex flex-col space-y-2 text-center sm:text-left",
+      className
+    )}
+    {...props}
+  />
+)
+SheetHeader.displayName = "SheetHeader"
+
+const SheetFooter = ({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) => (
+  <div
+    className={cn(
+      "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
+      className
+    )}
+    {...props}
+  />
+)
+SheetFooter.displayName = "SheetFooter"
+
+const SheetTitle = React.forwardRef<
+  React.ElementRef<typeof SheetPrimitive.Title>,
+  React.ComponentPropsWithoutRef<typeof SheetPrimitive.Title>
+>(({ className, ...props }, ref) => (
+  <SheetPrimitive.Title
+    ref={ref}
+    className={cn("text-lg font-semibold text-foreground", className)}
+    {...props}
+  />
+))
+SheetTitle.displayName = SheetPrimitive.Title.displayName
+
+const SheetDescription = React.forwardRef<
+  React.ElementRef<typeof SheetPrimitive.Description>,
+  React.ComponentPropsWithoutRef<typeof SheetPrimitive.Description>
+>(({ className, ...props }, ref) => (
+  <SheetPrimitive.Description
+    ref={ref}
+    className={cn("text-sm text-muted-foreground", className)}
+    {...props}
+  />
+))
+SheetDescription.displayName = SheetPrimitive.Description.displayName
+
+export {
+  Sheet,
+  SheetPortal,
+  SheetOverlay,
+  SheetTrigger,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetFooter,
+  SheetTitle,
+  SheetDescription,
+}
+
+==> app/error.tsx <==
+"use client";
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  return (
+    <div className="flex h-[50vh] flex-col items-center justify-center space-y-4">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold">Something went wrong!</h2>
+        <p className="text-muted-foreground mt-2">{error.message}</p>
+      </div>
+      <button
+        onClick={() => reset()}
+        className="rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
+      >
+        Try again
+      </button>
+    </div>
+  );
+}
+
+==> app/globals.css <==
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+ 
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+ 
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+ 
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+ 
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+ 
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+ 
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+ 
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+ 
+    --radius: 0.5rem;
+  }
+ 
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+ 
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+ 
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+ 
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+ 
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+ 
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+ 
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+ 
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+ 
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+ 
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+==> app/layout.tsx <==
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { headers } from "next/headers";
+import { Providers } from "./providers";
+import { Navigation } from "./components/Navigation";
+
+const inter = Inter({ subsets: ["latin"] });
+
+export const metadata = {
+  title: "Firearms Legislation Tracker",
+  description: "Track and monitor firearms legislation across jurisdictions",
+  icons: {
+    icon: "/favicon.ico",
+  },
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+};
+
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
+        <Providers>
+          <div className="min-h-screen bg-background text-foreground">
+            <Navigation />
+            <main className="flex min-h-screen flex-col">
+              <div className="flex-1 container mx-auto px-4">
+                {children}
+              </div>
+            </main>
+          </div>
+        </Providers>
+      </body>
+    </html>
+  );
+}
+
+==> app/lib/actions/bill-actions.ts <==
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { db } from "@/lib/db";
+import axios from "axios";
+import { 
+  type LegislativeAPIBill,
+  type SearchBillsResponse,
+  type GetBillResponse,
+  type BillDocumentLink,
+  type BillDocumentOrVersion,
+  type BillSponsorship,
+  type Organization,
+  searchParamsSchema,
+  convertApiToPrisma,
+  parseJsonField
+} from "@/lib/types/bill";
+
+// OpenStates API configuration
+const OPENSTATES_API_KEY = process.env.OPENSTATES_API_KEY;
+const OPENSTATES_API_URL = process.env.OPENSTATES_API_URL;
+
+if (!OPENSTATES_API_KEY || !OPENSTATES_API_URL) {
+  throw new Error("OpenStates API configuration is missing");
+}
+
+// Rate limiter
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// OpenStates API client
+const openstatesApi = axios.create({
+  baseURL: OPENSTATES_API_URL,
+  headers: {
+    'X-API-KEY': OPENSTATES_API_KEY,
+  },
+});
+
+// Map of US States to their OpenStates jurisdiction IDs
+const STATE_IDS: Record<string, string> = {
+  'Alabama': 'al',
+  'Alaska': 'ak',
+  'Arizona': 'az',
+  'Arkansas': 'ar',
+  'California': 'ca',
+  'Colorado': 'co',
+  'Connecticut': 'ct',
+  'Delaware': 'de',
+  'Florida': 'fl',
+  'Georgia': 'ga',
+  'Hawaii': 'hi',
+  'Idaho': 'id',
+  'Illinois': 'il',
+  'Indiana': 'in',
+  'Iowa': 'ia',
+  'Kansas': 'ks',
+  'Kentucky': 'ky',
+  'Louisiana': 'la',
+  'Maine': 'me',
+  'Maryland': 'md',
+  'Massachusetts': 'ma',
+  'Michigan': 'mi',
+  'Minnesota': 'mn',
+  'Mississippi': 'ms',
+  'Missouri': 'mo',
+  'Montana': 'mt',
+  'Nebraska': 'ne',
+  'Nevada': 'nv',
+  'New Hampshire': 'nh',
+  'New Jersey': 'nj',
+  'New Mexico': 'nm',
+  'New York': 'ny',
+  'North Carolina': 'nc',
+  'North Dakota': 'nd',
+  'Ohio': 'oh',
+  'Oklahoma': 'ok',
+  'Oregon': 'or',
+  'Pennsylvania': 'pa',
+  'Rhode Island': 'ri',
+  'South Carolina': 'sc',
+  'South Dakota': 'sd',
+  'Tennessee': 'tn',
+  'Texas': 'tx',
+  'Utah': 'ut',
+  'Vermont': 'vt',
+  'Virginia': 'va',
+  'Washington': 'wa',
+  'West Virginia': 'wv',
+  'Wisconsin': 'wi',
+  'Wyoming': 'wy'
+};
+
+// US States in alphabetical order
+const US_STATES = Object.keys(STATE_IDS).sort();
+
+// Fetch bills from OpenStates API with pagination
+// Process a single bill and save to database
+async function processBill(bill: any, state: string) {
+  console.log(`[Sync] ${state}: Processing bill ${bill.id}...`);
+  
+  // Convert documents to proper format
+  const documents = bill.documents?.map((doc: BillDocumentOrVersion) => ({
+    id: doc.id,
+    bill_id: bill.id,
+    note: doc.note || null,
+    date: doc.date ? new Date(doc.date) : null,
+    links: doc.links ? JSON.stringify(doc.links) : null
+  })) || [];
+
+  // Convert versions to proper format
+  const versions = bill.versions?.map((ver: BillDocumentOrVersion) => ({
+    id: ver.id,
+    bill_id: bill.id,
+    note: ver.note || null,
+    date: ver.date ? new Date(ver.date) : null,
+    links: ver.links ? JSON.stringify(ver.links) : null
+  })) || [];
+
+  // Process all bill data
+  const billData = {
+    id: bill.id,
+    identifier: bill.identifier,
+    title: bill.title || null,
+    session: bill.session || null,
+    classification: bill.classification ? JSON.stringify(bill.classification) : null,
+    subject: bill.subject ? JSON.stringify(bill.subject) : null,
+    extras: bill.extras ? JSON.stringify(bill.extras) : null,
+    openstates_url: bill.openstates_url || null,
+    first_action_date: bill.first_action_date ? new Date(bill.first_action_date) : null,
+    latest_action_date: bill.latest_action_date ? new Date(bill.latest_action_date) : null,
+    latest_action_description: bill.latest_action_description || null,
+    latest_passage_date: bill.latest_passage_date ? new Date(bill.latest_passage_date) : null,
+    jurisdiction_id: bill.jurisdiction?.id || null,
+    jurisdiction_name: bill.jurisdiction?.name || null,
+    jurisdiction_classification: bill.jurisdiction?.classification || null,
+    from_organization_id: bill.from_organization?.id || null,
+    from_organization_name: bill.from_organization?.name || null,
+    from_organization_classification: bill.from_organization?.classification || null,
+  };
+
+  // Process related data
+  const actions = bill.actions?.map((action: { 
+    id: string;
+    organization: { name?: string };
+    description: string;
+    date: string;
+    classification: string[];
+    order: number;
+  }) => ({
+    id: action.id,
+    bill_id: bill.id,
+    description: action.description,
+    date: action.date ? new Date(action.date) : null,
+    classification: action.classification ? JSON.stringify(action.classification) : null,
+    order: action.order || null,
+    organization_name: action.organization?.name || null,
+  })) || [];
+
+  const sponsors = bill.sponsorships?.map((sponsor: BillSponsorship) => ({
+    id: sponsor.id,
+    bill_id: bill.id,
+    name: sponsor.name,
+    primary: sponsor.primary || false,
+    classification: sponsor.classification || null,
+  })) || [];
+
+  interface VoteCount {
+    option: string;
+    value: number;
+  }
+
+  interface Vote {
+    id: string;
+    option: string;
+    voter_name: string;
+    voter_id: string | null;
+    voter_party: string | null;
+  }
+
+  interface ProcessedVoteEvent {
+    id: string;
+    bill_id: string;
+    identifier: string;
+    motion_text: string;
+    start_date: Date;
+    result: string;
+    counts: VoteCount[];
+    votes: Vote[];
+  }
+
+  // Process votes from API response
+  const votes = bill.votes?.map((apiVote: { 
+    id: string;
+    organization?: Organization;
+    motion_text?: string;
+    start_date?: string;
+    result?: string;
+    counts: { option: string; value: number }[];
+    votes: { option: string; voter_name: string; voter_id?: string; voter_party?: string }[];
+  }) => ({
+    // VoteEvent fields only
+    id: apiVote.id,
+    bill_id: bill.id,
+    identifier: apiVote.id,
+    motion_text: apiVote.motion_text || "Vote",
+    start_date: apiVote.start_date ? new Date(apiVote.start_date) : new Date(),
+    result: apiVote.result || "unknown",
+    // Process nested relations with only valid fields
+    counts: apiVote.counts?.map(count => ({
+      vote_event_id: apiVote.id,  // Use vote_event_id instead of bill_id
+      option: count.option,
+      value: count.value
+    })) || [],
+    votes: apiVote.votes?.map(v => ({
+      id: `${apiVote.id}-${v.voter_name}`,
+      vote_event_id: apiVote.id,  // Use vote_event_id instead of bill_id
+      option: v.option,
+      voter_name: v.voter_name,
+      voter_id: v.voter_id || null,
+      voter_party: v.voter_party || null
+    })) || []
+  })) || [];
+
+  const sources = bill.sources?.map((source: { url: string; note?: string }, index: number) => ({
+    id: `${bill.id}-source-${index}`,
+    bill_id: bill.id,
+    url: source.url,
+    note: source.note || null,
+  })) || [];
+
+  const abstracts = bill.abstracts?.map((abstract: { abstract: string; note?: string }, index: number) => ({
+    id: `${bill.id}-abstract-${index}`,
+    bill_id: bill.id,
+    abstract: abstract.abstract,
+    note: abstract.note || null,
+  })) || [];
+
+  const otherTitles = bill.other_titles?.map((title: { title: string; note?: string }, index: number) => ({
+    id: `${bill.id}-title-${index}`,
+    bill_id: bill.id,
+    title: title.title,
+    note: title.note || null,
+  })) || [];
+
+  const otherIdentifiers = bill.other_identifiers?.map((identifier: { 
+    identifier: string; 
+    note?: string;
+    scheme?: string;
+  }, index: number) => ({
+    id: `${bill.id}-identifier-${index}`,
+    bill_id: bill.id,
+    identifier: identifier.identifier,
+    note: identifier.note || null,
+    scheme: identifier.scheme || null,
+  })) || [];
+
+  try {
+    console.log(`[Sync] ${state}: Saving bill ${bill.id} to database...`);
+    
+    // Upsert bill and all related data
+    await db.bill.upsert({
+      where: { id: billData.id },
+      update: {
+        ...billData,
+        actions: {
+          deleteMany: {},
+          createMany: { data: actions }
+        },
+        sponsors: {
+          deleteMany: {},
+          createMany: { data: sponsors }
+        },
+        documents: {
+          deleteMany: {},
+          createMany: { data: documents }
+        },
+        versions: {
+          deleteMany: {},
+          createMany: { data: versions }
+        },
+          votes: {
+            deleteMany: {},
+            create: votes.map((vote: ProcessedVoteEvent) => ({
+              id: vote.id,
+              identifier: vote.identifier,
+              motion_text: vote.motion_text,
+              start_date: vote.start_date ? new Date(vote.start_date) : null,
+              result: vote.result,
+              counts: {
+                createMany: {
+                  data: vote.counts.map((count: VoteCount) => ({
+                    option: count.option,
+                    value: count.value
+                  }))
+                }
+              },
+              votes: {
+                createMany: {
+                  data: vote.votes.map((v: Vote) => ({
+                    id: v.id,
+                    option: v.option,
+                    voter_name: v.voter_name,
+                    voter_id: v.voter_id,
+                    voter_party: v.voter_party
+                  }))
+                }
+              }
+            }))
+          },
+        sources: {
+          deleteMany: {},
+          createMany: { data: sources }
+        },
+        abstracts: {
+          deleteMany: {},
+          createMany: { data: abstracts }
+        },
+        other_titles: {
+          deleteMany: {},
+          createMany: { data: otherTitles }
+        },
+        other_identifiers: {
+          deleteMany: {},
+          createMany: { data: otherIdentifiers }
+        }
+      },
+      create: {
+        ...billData,
+        actions: {
+          createMany: { data: actions }
+        },
+        sponsors: {
+          createMany: { data: sponsors }
+        },
+        documents: {
+          createMany: { data: documents }
+        },
+        versions: {
+          createMany: { data: versions }
+        },
+          votes: {
+            create: votes.map((vote: ProcessedVoteEvent) => ({
+              id: vote.id,
+              identifier: vote.identifier,
+              motion_text: vote.motion_text,
+              start_date: vote.start_date ? new Date(vote.start_date) : null,
+              result: vote.result,
+              counts: {
+                createMany: {
+                  data: vote.counts.map((count: VoteCount) => ({
+                    option: count.option,
+                    value: count.value
+                  }))
+                }
+              },
+              votes: {
+                createMany: {
+                  data: vote.votes.map((v: Vote) => ({
+                    id: v.id,
+                    option: v.option,
+                    voter_name: v.voter_name,
+                    voter_id: v.voter_id,
+                    voter_party: v.voter_party
+                  }))
+                }
+              }
+            }))
+          },
+        sources: {
+          createMany: { data: sources }
+        },
+        abstracts: {
+          createMany: { data: abstracts }
+        },
+        other_titles: {
+          createMany: { data: otherTitles }
+        },
+        other_identifiers: {
+          createMany: { data: otherIdentifiers }
+        }
+      }
+    });
+
+    // Validate sponsor records were created
+    const hasSponsors = await validateSponsors(bill.id);
+    console.log(`[Sync] ${state}: Bill ${bill.id} sponsors validated: ${hasSponsors}`);
+
+    return true;
+  } catch (error) {
+    console.error(`[Sync] ${state}: Error saving bill ${bill.id}:`, JSON.stringify(error, null, 2));
+    return false;
+  }
+}
+
+async function fetchFromLegislativeAPI(state: string) {
+  try {
+    console.log(`[Sync] Starting fetch for ${state}...`);
+    
+    // Calculate date 30 days ago
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const formattedDate = thirtyDaysAgo.toISOString().split('T')[0];
+
+    let page = 1;
+    let hasMore = true;
+    let totalProcessed = 0;
+    let successfulSaves = 0;
+
+    while (hasMore) {
+      console.log(`[Sync] ${state}: Fetching page ${page}...`);
+      
+      // Rate limiting: wait 1 second between requests
+      if (page > 1) {
+        await sleep(1000);
+      }
+
+      try {
+        // Build URL parameters
+        const params = new URLSearchParams();
+        params.append('q', 'firearm');
+        params.append('jurisdiction', STATE_IDS[state]);
+        params.append('sort', 'updated_desc');
+        params.append('page', page.toString());
+        params.append('per_page', '20');
+        params.append('updated_since', formattedDate);
+
+        // Add each include parameter separately
+        ['sponsorships', 'abstracts', 'other_titles', 'other_identifiers', 
+         'actions', 'sources', 'documents', 'versions', 'votes'].forEach(item => {
+          params.append('include', item);
+        });
+
+        const response = await openstatesApi.get('/bills?' + params.toString());
+        const { results, pagination } = response.data;
+        
+        console.log(`[Sync] ${state}: Found ${results.length} bills on page ${page}`);
+
+        // Process and save each bill immediately
+        for (const bill of results) {
+          const success = await processBill(bill, state);
+          if (success) successfulSaves++;
+          totalProcessed++;
+        }
+
+        // Check if we have more pages
+        hasMore = page < pagination.max_page && page < 5; // Limit to 100 bills (5 pages * 20 per page)
+        page++;
+
+      } catch (error) {
+        if (axios.isAxiosError(error) && error.response?.status === 429) {
+          console.log(`[Sync] ${state}: Rate limit hit, waiting 60 seconds...`);
+          await sleep(60000); // Wait 60 seconds
+          page--; // Retry the same page
+          continue;
+        }
+        console.error(`[Sync] ${state}: Error fetching bills:`, error);
+        // Don't throw error, return what we have so far
+        hasMore = false;
+      }
+
+      // Standard rate limit wait between successful requests
+      await sleep(1000);
+    }
+
+    console.log(`[Sync] ${state}: Completed with ${successfulSaves}/${totalProcessed} bills saved`);
+    return {
+      bills: totalProcessed,
+      saved: successfulSaves,
+      state,
+    };
+  } catch (error) {
+    console.error('Failed to fetch from OpenStates:', error);
+    throw error;
+  }
+}
+
+// Validate sponsor records for a bill
+async function validateSponsors(billId: string) {
+  const sponsors = await db.sponsor.findMany({
+    where: { bill_id: billId }
+  });
+  return sponsors.length > 0;
+}
+
+// Server action to fetch and sync bills
+export async function syncBillsFromAPI() {
+  try {
+    let totalBills = 0;
+    let totalSaved = 0;
+    
+    // Process each state sequentially
+    for (const state of US_STATES) {
+      try {
+        const result = await fetchFromLegislativeAPI(state);
+        totalBills += result.bills;
+        totalSaved += result.saved;
+
+        // Add a delay between states to prevent rate limiting
+        await sleep(2000);
+        
+      } catch (error) {
+        console.error(`[Sync] Error processing ${state}:`, error);
+        // Continue with next state even if one fails
+      }
+    }
+
+    console.log(`[Sync] Completed all states. Bills processed: ${totalBills}, Successfully saved: ${totalSaved}`);
+    
+    revalidatePath("/bills");
+    return { 
+      success: true,
+      data: {
+        totalSynced: totalSaved
+      }
+    };
+  } catch (error) {
+    console.error("Failed to sync bills:", error);
+    return { 
+      success: false, 
+      error: "Failed to sync bills",
+      data: {
+        totalSynced: 0
+      }
+    };
+  }
+}
+
+// Server action to search bills
+export async function searchBills(formData: FormData): Promise<SearchBillsResponse> {
+  try {
+    const parsed = searchParamsSchema.parse({
+      query: formData.get("query") || undefined,
+      state: formData.get("state") || undefined,
+      status: formData.get("status") || undefined,
+      page: Number(formData.get("page")) || 1,
+      limit: Number(formData.get("limit")) || 10,
+    });
+
+    const where = {
+      AND: [
+        parsed.query
+          ? {
+              OR: [
+                { title: { contains: parsed.query } },
+                { identifier: { contains: parsed.query } },
+              ],
+            }
+          : {},
+        parsed.state ? { jurisdiction_name: parsed.state } : {},
+        parsed.status ? { latest_action_description: { contains: parsed.status } } : {},
+      ],
+    };
+
+    const [bills, total] = await Promise.all([
+      db.bill.findMany({
+        where,
+        skip: (parsed.page - 1) * parsed.limit,
+        take: parsed.limit,
+        orderBy: { latest_action_date: "desc" },
+        include: {
+          sponsors: true,
+          actions: {
+            orderBy: { date: "desc" },
+            take: 1,
+          },
+          documents: true,
+          versions: true,
+          sources: true,
+          abstracts: true,
+          other_titles: true,
+          other_identifiers: true,
+          related_bills: true,
+          votes: {
+            include: {
+              votes: true,
+              counts: true,
+            },
+          },
+          comments: {
+            orderBy: { created_at: "desc" },
+          },
+          annotations: {
+            orderBy: { created_at: "desc" },
+          },
+        },
+      }),
+      db.bill.count({ where }),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        bills: bills.map((bill: any) => ({
+          ...bill,
+          classification: parseJsonField(bill.classification),
+          subject: parseJsonField(bill.subject),
+          extras: parseJsonField(bill.extras),
+          documents: bill.documents?.map((doc: { id: string, links: string | null, note: string | null, date: Date | null }) => ({
+            ...doc,
+            links: doc.links ? parseJsonField<BillDocumentLink[]>(doc.links) : null,
+          })) || [],
+          versions: bill.versions?.map((ver: { id: string, links: string | null, note: string | null, date: Date | null }) => ({
+            ...ver,
+            links: ver.links ? parseJsonField<BillDocumentLink[]>(ver.links) : null,
+          })) || [],
+          actions: bill.actions.map((action: { id: string, classification: string | null, description: string, date: Date }) => ({
+            ...action,
+            classification: parseJsonField(action.classification),
+          })),
+        })),
+        pagination: {
+          total,
+          pages: Math.ceil(total / parsed.limit),
+          current: parsed.page,
+        },
+      },
+    };
+  } catch (error) {
+    console.error("Failed to search bills:", error);
+    return { error: "Failed to search bills" };
+  }
+}
+
+// Server action to get a single bill by ID
+export async function getBillById(id: string): Promise<GetBillResponse> {
+  try {
+    const bill = await db.bill.findUnique({
+      where: { id },
+      include: {
+        sponsors: true,
+        actions: {
+          orderBy: { date: "desc" },
+          select: {
+            id: true,
+            bill_id: true,
+            description: true,
+            date: true,
+            classification: true,
+            order: true,
+            organization_name: true,
+          },
+        },
+        votes: {
+          include: {
+            votes: true,
+            counts: true,
+          },
+        },
+        documents: true,
+        versions: true,
+        comments: {
+          orderBy: { created_at: "desc" },
+        },
+        annotations: {
+          orderBy: { created_at: "desc" },
+        },
+      },
+    });
+
+    if (!bill) {
+      return { error: "Bill not found" };
+    }
+
+    return { 
+      success: true,
+      data: {
+        bill: {
+          id: bill.id,
+          identifier: bill.identifier,
+          title: bill.title,
+          session: bill.session,
+          classification: parseJsonField(bill.classification),
+          subject: parseJsonField(bill.subject),
+          extras: parseJsonField(bill.extras),
+          openstates_url: bill.openstates_url,
+          first_action_date: bill.first_action_date,
+          latest_action_date: bill.latest_action_date,
+          latest_action_description: bill.latest_action_description,
+          latest_passage_date: bill.latest_passage_date,
+          jurisdiction_id: bill.jurisdiction_id,
+          jurisdiction_name: bill.jurisdiction_name,
+          jurisdiction_classification: bill.jurisdiction_classification,
+          from_organization_id: bill.from_organization_id,
+          from_organization_name: bill.from_organization_name,
+          from_organization_classification: bill.from_organization_classification,
+          created_at: bill.created_at,
+          updated_at: bill.updated_at,
+          actions: bill.actions.map(action => ({
+            ...action,
+            classification: action.classification ? JSON.parse(action.classification) : null,
+          })),
+          votes: bill.votes,
+          documents: bill.documents?.map(doc => ({
+            ...doc,
+            links: doc.links ? parseJsonField<BillDocumentLink[]>(doc.links) : null,
+          })) || [],
+          versions: bill.versions?.map(ver => ({
+            ...ver,
+            links: ver.links ? parseJsonField<BillDocumentLink[]>(ver.links) : null,
+          })) || [],
+          sponsors: bill.sponsors,
+          comments: bill.comments,
+          annotations: bill.annotations,
+        },
+      },
+    };
+  } catch (error) {
+    console.error("Failed to get bill:", error);
+    return { error: "Failed to get bill details" };
+  }
+}
+
+// Mock LLM analysis function
+async function performLLMAnalysis(text: string): Promise<string> {
+  // In production, this would call a real LLM API
+  return "This bill appears to focus on firearm regulations, specifically addressing...";
+}
+
+// Server action to analyze bill text
+export async function analyzeBillText(billId: string) {
+  try {
+    const bill = await db.bill.findUnique({
+      where: { id: billId },
+      include: { versions: true },
+    });
+
+    if (!bill) {
+      return { error: "Bill not found" };
+    }
+
+    // In production, we'd get the actual bill text from the latest version
+    // For MVP, we'll use a mock analysis
+    const analysis = await performLLMAnalysis(bill.title || "");
+
+    // Save the analysis as an annotation
+    await db.billAnnotation.create({
+      data: {
+        bill_id: billId,
+        text: analysis,
+      },
+    });
+
+    revalidatePath(`/bills/${billId}`);
+    return { success: true, analysis };
+  } catch (error) {
+    console.error("Failed to analyze bill:", error);
+    return { error: "Failed to analyze bill" };
+  }
+}
+
+==> app/lib/actions/rss-actions.ts <==
+"use server";
+
+import { revalidatePath } from "next/cache";
+import Parser from "rss-parser";
+import { z } from "zod";
+
+const parser = new Parser();
+
+// Zod schema for RSS feed
+const rssFeedSchema = z.object({
+  url: z.string().url(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+});
+
+export type RSSFeed = z.infer<typeof rssFeedSchema>;
+
+// Type for RSS feed items
+export type RSSItem = {
+  title: string;
+  link: string;
+  content?: string;
+  contentSnippet?: string;
+  pubDate?: string;
+  categories?: string[];
+};
+
+// Server action to fetch and parse RSS feed
+export async function fetchRSSFeed(formData: FormData) {
+  try {
+    const url = formData.get("url");
+    const result = rssFeedSchema.safeParse({ url });
+
+    if (!result.success) {
+      return { error: "Invalid RSS feed URL" };
+    }
+
+    const feed = await parser.parseURL(result.data.url);
+    
+    // Transform feed items to our format
+    const items = feed.items.map(item => ({
+      title: item.title || "",
+      link: item.link || "",
+      content: item.content,
+      contentSnippet: item.contentSnippet,
+      pubDate: item.pubDate,
+      categories: item.categories,
+    }));
+
+    return {
+      success: true,
+      data: {
+        title: feed.title,
+        description: feed.description,
+        link: feed.link,
+        items,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to fetch RSS feed:", error);
+    return { error: "Failed to fetch RSS feed" };
+  }
+}
+
+// Mock function to analyze RSS content with LLM
+async function analyzeRSSContent(content: string): Promise<string> {
+  // In production, this would call a real LLM API
+  return "This article discusses proposed firearm legislation...";
+}
+
+// Server action to analyze RSS feed item
+export async function analyzeRSSItem(formData: FormData) {
+  try {
+    const content = formData.get("content");
+    if (!content || typeof content !== "string") {
+      return { error: "No content provided" };
+    }
+
+    const analysis = await analyzeRSSContent(content);
+
+    return {
+      success: true,
+      data: {
+        analysis,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to analyze RSS content:", error);
+    return { error: "Failed to analyze RSS content" };
+  }
+}
+
+// Server action to fetch multiple RSS feeds
+export async function fetchMultipleRSSFeeds(feeds: RSSFeed[]) {
+  try {
+    const results = await Promise.allSettled(
+      feeds.map(async (feed) => {
+        try {
+          const parsedFeed = await parser.parseURL(feed.url);
+          return {
+            url: feed.url,
+            name: feed.name,
+            items: parsedFeed.items.map(item => ({
+              title: item.title || "",
+              link: item.link || "",
+              content: item.content,
+              contentSnippet: item.contentSnippet,
+              pubDate: item.pubDate,
+              categories: item.categories,
+            })),
+          };
+        } catch (error) {
+          console.error(`Failed to fetch RSS feed ${feed.url}:`, error);
+          return null;
+        }
+      })
+    );
+
+    const successfulFeeds = results
+      .map((result, index) => {
+        if (result.status === "fulfilled" && result.value) {
+          return result.value;
+        }
+        console.error(`Failed to fetch RSS feed ${feeds[index].url}`);
+        return null;
+      })
+      .filter((feed): feed is NonNullable<typeof feed> => feed !== null);
+
+    return {
+      success: true,
+      data: {
+        feeds: successfulFeeds,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to fetch RSS feeds:", error);
+    return { error: "Failed to fetch RSS feeds" };
+  }
+}
+
+==> app/lib/db.ts <==
+import { PrismaClient } from '@prisma/client';
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+export const db =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+  });
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db;
+
+==> app/lib/store/index.ts <==
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+interface FilterState {
+  state: string | null;
+  status: string | null;
+  searchQuery: string;
+  page: number;
+  limit: number;
+}
+
+interface SyncState {
+  isSyncing: boolean;
+  lastSyncTime: string | null;
+  totalBillsSynced: number;
+}
+
+interface UIState {
+  sidebarOpen: boolean;
+  selectedBillId: string | null;
+  filters: FilterState;
+  darkMode: boolean;
+  sync: SyncState;
+}
+
+interface UIActions {
+  setSyncing: (isSyncing: boolean) => void;
+  updateSyncStats: (totalBills: number) => void;
+  toggleSidebar: () => void;
+  setSidebarOpen: (open: boolean) => void;
+  setSelectedBill: (billId: string | null) => void;
+  setFilter: (key: keyof FilterState, value: string | number | null) => void;
+  resetFilters: () => void;
+  toggleDarkMode: () => void;
+}
+
+const initialFilters: FilterState = {
+  state: null,
+  status: null,
+  searchQuery: '',
+  page: 1,
+  limit: 10,
+};
+
+export const useStore = create<UIState & UIActions>()(
+  persist(
+    (set) => ({
+      // Initial state
+      sidebarOpen: true,
+      selectedBillId: null,
+      filters: initialFilters,
+      darkMode: false,
+      sync: {
+        isSyncing: false,
+        lastSyncTime: null,
+        totalBillsSynced: 0,
+      },
+
+      // Actions
+      setSyncing: (isSyncing: boolean) =>
+        set((state) => ({
+          sync: {
+            ...state.sync,
+            isSyncing,
+            ...(isSyncing ? {} : { lastSyncTime: new Date().toISOString() }),
+          },
+        })),
+
+      updateSyncStats: (totalBills: number) =>
+        set((state) => ({
+          sync: {
+            ...state.sync,
+            totalBillsSynced: totalBills,
+          },
+        })),
+
+      toggleSidebar: () =>
+        set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+      
+      setSidebarOpen: (open: boolean) =>
+        set({ sidebarOpen: open }),
+      
+      setSelectedBill: (billId: string | null) =>
+        set({ selectedBillId: billId }),
+      
+      setFilter: (key: keyof FilterState, value: string | number | null) =>
+        set((state) => ({
+          filters: {
+            ...state.filters,
+            [key]: value,
+            // Reset page when changing filters
+            ...(key !== 'page' && { page: 1 }),
+          },
+        })),
+      
+      resetFilters: () =>
+        set({ filters: initialFilters }),
+
+      toggleDarkMode: () =>
+        set((state) => ({ darkMode: !state.darkMode })),
+    }),
+    {
+      name: 'firetrack-storage',
+      partialize: (state) => ({
+        darkMode: state.darkMode,
+        filters: state.filters,
+      }),
+    }
+  )
+);
+
+// Selector hooks for specific state slices
+export const useFilters = () => useStore((state) => state.filters);
+export const useSidebar = () => useStore((state) => ({
+  open: state.sidebarOpen,
+  toggle: state.toggleSidebar,
+  setOpen: state.setSidebarOpen,
+}));
+export const useSelectedBill = () => useStore((state) => ({
+  selectedBillId: state.selectedBillId,
+  setSelectedBill: state.setSelectedBill,
+}));
+export const useDarkMode = () => useStore((state) => ({
+  darkMode: state.darkMode,
+  toggle: state.toggleDarkMode,
+}));
+
+export const useSync = () => useStore((state) => ({
+  ...state.sync,
+  setSyncing: state.setSyncing,
+  updateSyncStats: state.updateSyncStats,
+}));
+
+==> app/lib/types/bill.ts <==
+import { z } from 'zod';
+import type { Bill as PrismaBill } from '@prisma/client';
+
+// Helper functions for JSON string fields
+export const parseJsonField = <T>(value: string | null): T | null => {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+};
+
+export const stringifyJsonField = <T>(value: T | null): string | null => {
+  if (!value) return null;
+  return JSON.stringify(value);
+};
+
+// OpenStates API types
+export type Organization = {
+  id: string;
+  name: string;
+  classification: string;
+};
+
+export type CompactJurisdiction = {
+  id: string;
+  name: string;
+  classification: string;
+};
+
+export type BillSponsorship = {
+  id: string;
+  name: string;
+  entity_type: string;
+  organization?: Organization;
+  primary: boolean;
+  classification: string;
+};
+
+export type BillDocumentLink = {
+  url: string;
+  media_type: string;
+};
+
+export type BillDocumentOrVersion = {
+  id: string;
+  note: string;
+  date: string;
+  links: BillDocumentLink[];
+};
+
+// Type for the legislative API response
+export type LegislativeAPIBill = {
+  id: string;
+  session: string;
+  jurisdiction: CompactJurisdiction;
+  from_organization: Organization;
+  identifier: string;
+  title: string;
+  classification?: string[];
+  subject?: string[];
+  extras?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+  openstates_url?: string;
+  first_action_date?: string;
+  latest_action_date?: string;
+  latest_action_description?: string;
+  latest_passage_date?: string;
+  sponsorships?: BillSponsorship[];
+  actions?: {
+    id: string;
+    organization: Organization;
+    description: string;
+    date: string;
+    classification: string[];
+    order: number;
+    related_entities?: any[];
+  }[];
+  sources?: { url: string; note?: string }[];
+  versions?: BillDocumentOrVersion[];
+  documents?: BillDocumentOrVersion[];
+};
+
+// Zod schemas for validation
+export const billSchema = z.object({
+  id: z.string(),
+  identifier: z.string(),
+  title: z.string().nullable(),
+  session: z.string().nullable(),
+  classification: z.string().optional().transform((val) => 
+    val ? parseJsonField<string[]>(val) : null
+  ),
+  subject: z.string().optional().transform((val) => 
+    val ? parseJsonField<string[]>(val) : null
+  ),
+  extras: z.string().optional().transform((val) => 
+    val ? parseJsonField<Record<string, unknown>>(val) : null
+  ),
+  openstates_url: z.string().nullable(),
+  first_action_date: z.date().nullable(),
+  latest_action_date: z.date().nullable(),
+  latest_action_description: z.string().nullable(),
+  latest_passage_date: z.date().nullable(),
+  jurisdiction_id: z.string().nullable(),
+  jurisdiction_name: z.string().nullable(),
+  jurisdiction_classification: z.string().nullable(),
+  from_organization_id: z.string().nullable(),
+  from_organization_name: z.string().nullable(),
+  from_organization_classification: z.string().nullable(),
+  created_at: z.date(),
+  updated_at: z.date(),
+});
+
+export interface Sponsor {
+  id: string;
+  bill_id: string;
+  name: string;
+  primary: boolean | null;
+  classification?: string | null;
+}
+
+export interface Document {
+  id: string;
+  bill_id: string;
+  note: string | null;
+  date: Date | null;
+  links: BillDocumentLink[] | null;
+}
+
+export interface Version {
+  id: string;
+  bill_id: string;
+  note: string | null;
+  date: Date | null;
+  links: BillDocumentLink[] | null;
+}
+
+export type Bill = z.infer<typeof billSchema> & {
+  sponsors?: Sponsor[];
+  documents?: Document[];
+  versions?: Version[];
+};
+
+// Helper to convert API response to Prisma format
+export const convertApiToPrisma = (bill: LegislativeAPIBill) => {
+  const prismaData = {
+    id: bill.id,
+    identifier: bill.identifier,
+    title: bill.title || null,
+    session: bill.session || null,
+    classification: bill.classification ? stringifyJsonField(bill.classification) : null,
+    subject: bill.subject ? stringifyJsonField(bill.subject) : null,
+    extras: bill.extras ? stringifyJsonField(bill.extras) : null,
+    openstates_url: bill.openstates_url || null,
+    first_action_date: bill.first_action_date ? new Date(bill.first_action_date) : null,
+    latest_action_date: bill.latest_action_date ? new Date(bill.latest_action_date) : null,
+    latest_action_description: bill.latest_action_description || null,
+    latest_passage_date: bill.latest_passage_date ? new Date(bill.latest_passage_date) : null,
+    jurisdiction_id: bill.jurisdiction?.id || null,
+    jurisdiction_name: bill.jurisdiction?.name || null,
+    jurisdiction_classification: bill.jurisdiction?.classification || null,
+    from_organization_id: bill.from_organization?.id || null,
+    from_organization_name: bill.from_organization?.name || null,
+    from_organization_classification: bill.from_organization?.classification || null,
+  };
+
+  // Handle nested relations
+  const documents = bill.documents?.map(doc => ({
+    id: doc.id,
+    bill_id: bill.id,
+    note: doc.note || null,
+    date: doc.date ? new Date(doc.date) : null,
+    links: stringifyJsonField(doc.links),
+  })) || [];
+
+  const versions = bill.versions?.map(ver => ({
+    id: ver.id,
+    bill_id: bill.id,
+    note: ver.note || null,
+    date: ver.date ? new Date(ver.date) : null,
+    links: stringifyJsonField(ver.links),
+  })) || [];
+
+  return {
+    data: prismaData,
+    documents,
+    versions,
+  };
+};
+
+// Search params schema
+export const searchParamsSchema = z.object({
+  query: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  status: z.string().nullable().optional(),
+  page: z.coerce.number().optional().default(1),
+  limit: z.coerce.number().optional().default(10),
+});
+
+export type SearchParams = z.infer<typeof searchParamsSchema>;
+
+// Action response types
+export type BillActionResponse<T = unknown> = {
+  success?: boolean;
+  error?: string;
+  data?: T;
+};
+
+export type SearchBillsResponse = BillActionResponse<{
+  bills: Bill[];
+  pagination?: {
+    total: number;
+    pages: number;
+    current: number;
+  };
+}>;
+
+export interface BillActionType {
+  id: string;
+  bill_id: string;
+  description: string;
+  date: Date;
+  classification: string[] | null;
+  order: number;
+  organization_name: string | null;
+}
+
+export interface Vote {
+  id: string;
+  vote_event_id: string;
+  option: string;
+  voter_name: string;
+  voter_id: string | null;
+  voter_party: string | null;
+}
+
+export interface VoteEvent {
+  id: string;
+  bill_id: string;
+  identifier: string;
+  motion_text: string;
+  start_date: Date;
+  result: string;
+  votes: Vote[];
+  counts: {
+    id: number;
+    vote_event_id: string;
+    option: string;
+    value: number;
+  }[];
+}
+
+export interface BillComment {
+  id: number;
+  bill_id: string;
+  text: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface BillAnnotation {
+  id: number;
+  bill_id: string;
+  text: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export type GetBillResponse = BillActionResponse<{
+  bill: Bill & {
+    sponsors?: Sponsor[];
+    actions?: BillActionType[];
+    votes?: VoteEvent[];
+    documents?: Document[];
+    versions?: Version[];
+    comments?: BillComment[];
+    annotations?: BillAnnotation[];
+  };
+}>;
+
+==> app/lib/utils.ts <==
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+// Format date using Intl.DateTimeFormat
+export function formatDate(date: Date | string) {
+  if (typeof date === "string") {
+    date = new Date(date);
+  }
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(date);
+}
+
+// Format relative time (e.g., "2 days ago")
+export function formatRelativeTime(date: Date | string) {
+  if (typeof date === "string") {
+    date = new Date(date);
+  }
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const diffHours = Math.floor(diff / (1000 * 60 * 60));
+  const diffMinutes = Math.floor(diff / (1000 * 60));
+
+  if (diffDays > 30) {
+    return formatDate(date);
+  } else if (diffDays > 0) {
+    return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+  } else if (diffHours > 0) {
+    return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+  } else if (diffMinutes > 0) {
+    return `${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`;
+  } else {
+    return "just now";
+  }
+}
+
+// Truncate text with ellipsis
+export function truncateText(text: string, maxLength: number) {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + "...";
+}
+
+// Generate initials from name
+export function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase();
+}
+
+// Clean bill ID by removing prefix
+export function cleanBillId(id: string) {
+  return id.replace('ocd-bill/', '');
+}
+
+==> app/loading.tsx <==
+export default function Loading() {
+  return (
+    <div className="flex h-[50vh] items-center justify-center">
+      <div className="h-32 w-32 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
+    </div>
+  );
+}
+
+==> app/middleware.ts <==
+// Auth middleware disabled for MVP
+/*
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { auth } from "@/auth";
+
+export async function middleware(request: NextRequest) {
+  const session = await auth();
+
+  // List of public paths that don't require authentication
+  const publicPaths = ["/auth/signin"];
+
+  // Check if the current path is public
+  const isPublicPath = publicPaths.some((path) =>
+    request.nextUrl.pathname.startsWith(path)
+  );
+
+  // If the path is public, allow access
+  if (isPublicPath) {
+    return NextResponse.next();
+  }
+
+  // If not authenticated and not on a public path, redirect to signin
+  if (!session) {
+    const signInUrl = new URL("/auth/signin", request.url);
+    signInUrl.searchParams.set("callbackUrl", request.url);
+    return NextResponse.redirect(signInUrl);
+  }
+
+  // If authenticated and trying to access signin page, redirect to home
+  if (session && request.nextUrl.pathname.startsWith("/auth/signin")) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  return NextResponse.next();
+}
+
+// Configure which paths should be handled by middleware
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public (public files)
+     *//*
+    "/((?!_next/static|_next/image|favicon.ico|public).*)",
+  ],
+};
+*/
+
+==> app/not-found.tsx <==
+import Link from "next/link";
+
+export default function NotFound() {
+  return (
+    <div className="flex h-[50vh] flex-col items-center justify-center space-y-4">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold">Page Not Found</h2>
+        <p className="text-muted-foreground mt-2">
+          The page you're looking for doesn't exist or has been moved.
+        </p>
+      </div>
+      <Link
+        href="/"
+        className="rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
+      >
+        Return Home
+      </Link>
+    </div>
+  );
+}
+
+==> app/page.tsx <==
+import { searchBills } from "@/lib/actions/bill-actions";
+import { BillsList } from "@/components/BillsList";
+import { FilterMenu } from "@/components/FilterMenu";
+import { StateMap } from "@/components/StateMap";
+
+export default async function HomePage() {
+  // Get initial bills data
+  const initialBills = await searchBills(new FormData());
+
+  return (
+    <div className="h-screen flex flex-col">
+      <div className="container mx-auto px-4 flex-1 flex flex-col overflow-hidden">
+        <div className="bg-white rounded-lg shadow p-6 mb-8">
+          <StateMap />
+        </div>
+        <div className="bg-white rounded-lg shadow min-h-0 flex-1 overflow-hidden flex flex-col">
+          <div className="p-6 flex-1 overflow-auto">
+            <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10">
+              <h2 className="text-xl font-semibold">All Bills</h2>
+              <FilterMenu />
+            </div>
+            <BillsList initialBills={initialBills} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+==> app/providers.tsx <==
+"use client";
+
+import { useEffect } from "react";
+import { useDarkMode } from "@/lib/store/index";
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  const { darkMode } = useDarkMode();
+
+  // Update theme class on document when darkMode changes
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [darkMode]);
+
+  return (
+    <div className={darkMode ? "dark" : ""}>
+      {children}
+    </div>
+  );
+}
+
+==> app/settings/page.tsx <==
+import { SyncButton } from "@/components/SyncButton";
+import { SyncStatus } from "@/components/SyncStatus";
+
+export default function SettingsPage() {
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-8">Settings</h1>
+      
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-6">
+          <h2 className="text-xl font-semibold mb-4">Data Synchronization</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Sync the latest firearms legislation data from OpenStates API. This will fetch bills from the last 30 days.
+          </p>
+          <div className="space-y-4">
+            <SyncButton />
+            <SyncStatus />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+==> postcss.config.js <==
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+
+==> prisma/schema.prisma <==
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Bill {
+  id                             String    @id
+  identifier                     String
+  title                         String?
+  session                       String?
+  classification                String?    // Stored as JSON string
+  subject                       String?    // Stored as JSON string
+  extras                        String?    // Stored as JSON string
+  openstates_url               String?
+  
+  // Action dates
+  first_action_date            DateTime?
+  latest_action_date           DateTime?
+  latest_action_description    String?
+  latest_passage_date          DateTime?
+  
+  // Jurisdiction details
+  jurisdiction_id              String?
+  jurisdiction_name            String?
+  jurisdiction_classification  String?
+  
+  // Organization details
+  from_organization_id         String?
+  from_organization_name       String?
+  from_organization_classification String?
+  
+  // Timestamps
+  created_at                   DateTime   @default(now())
+  updated_at                   DateTime   @updatedAt
+
+  // Relations
+  sponsors          Sponsor[]
+  documents         Document[]
+  versions          Version[]
+  sources           Source[]
+  abstracts         Abstract[]
+  other_titles      OtherTitle[]
+  other_identifiers OtherIdentifier[]
+  related_bills     RelatedBill[]
+  votes             VoteEvent[]
+  actions           Action[]
+  comments          BillComment[]
+  annotations       BillAnnotation[]
+
+  @@map("bills")
+}
+
+model Sponsor {
+  id             String   @id
+  bill_id        String
+  name           String
+  primary        Boolean?
+  classification String?
+  bill           Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("sponsors")
+}
+
+model Document {
+  id        String    @id
+  bill_id   String
+  note      String?
+  date      DateTime?
+  links     String?   // Stored as JSON string
+  bill      Bill      @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("documents")
+}
+
+model Version {
+  id        String    @id
+  bill_id   String
+  note      String?
+  date      DateTime?
+  links     String?   // Stored as JSON string
+  bill      Bill      @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("versions")
+}
+
+model Source {
+  id        Int      @id @default(autoincrement())
+  bill_id   String
+  url       String
+  note      String?
+  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("sources")
+}
+
+model Abstract {
+  id        Int      @id @default(autoincrement())
+  bill_id   String
+  abstract  String
+  note      String?
+  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("abstracts")
+}
+
+model OtherTitle {
+  id        Int      @id @default(autoincrement())
+  bill_id   String
+  title     String
+  note      String?
+  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("other_titles")
+}
+
+model OtherIdentifier {
+  id          Int      @id @default(autoincrement())
+  bill_id     String
+  identifier  String
+  bill        Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("other_identifiers")
+}
+
+model RelatedBill {
+  id                  Int      @id @default(autoincrement())
+  bill_id            String
+  identifier         String
+  legislative_session String?
+  relation_type      String?
+  bill               Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("related_bills")
+}
+
+model Action {
+  id                String    @id
+  bill_id          String
+  description      String
+  date             DateTime
+  classification   String?   // Stored as JSON string
+  order            Int
+  organization_name String?
+  bill             Bill      @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("actions")
+}
+
+model VoteEvent {
+  id           String      @id
+  bill_id      String
+  identifier   String
+  motion_text  String
+  start_date   DateTime
+  result       String
+  votes        Vote[]
+  counts       VoteCount[]
+  bill         Bill        @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("vote_events")
+}
+
+model Vote {
+  id            String    @id
+  vote_event_id String
+  option        String
+  voter_name    String
+  voter_id      String?
+  voter_party   String?
+  vote_event    VoteEvent @relation(fields: [vote_event_id], references: [id], onDelete: Cascade)
+
+  @@map("votes")
+}
+
+model VoteCount {
+  id            Int       @id @default(autoincrement())
+  vote_event_id String
+  option        String
+  value         Int
+  vote_event    VoteEvent @relation(fields: [vote_event_id], references: [id], onDelete: Cascade)
+
+  @@map("vote_counts")
+}
+
+model BillComment {
+  id        Int      @id @default(autoincrement())
+  bill_id   String
+  text      String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("bill_comments")
+}
+
+model BillAnnotation {
+  id        Int      @id @default(autoincrement())
+  bill_id   String
+  text      String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("bill_annotations")
+}
+
+==> scripts/init-db.js <==
+import { PrismaClient } from '@prisma/client';
+import { execSync } from 'child_process';
+
+const prisma = new PrismaClient();
+
+async function main() {
+  try {
+    console.log('Resetting database...');
+    
+    // Reset the database using Prisma
+    console.log('Running database reset...');
+    execSync('npx prisma migrate reset --force', { stdio: 'inherit' });
+
+    console.log('Database initialization complete');
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    process.exit(1);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+main();
+
+==> scripts/sync-bills.js <==
+const axios = require('axios');
+const { PrismaClient } = require('@prisma/client');
+const dotenv = require('dotenv');
+const fs = require('fs').promises;
+const path = require('path');
+
+dotenv.config();
+
+const prisma = new PrismaClient();
+const SYNC_STATE_FILE = path.join(process.cwd(), '.sync-state.json');
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 5000; // 5 seconds
+const OPENSTATES_API_KEY = process.env.OPENSTATES_API_KEY;
+const OPENSTATES_API_URL = process.env.OPENSTATES_API_URL;
+
+if (!OPENSTATES_API_KEY || !OPENSTATES_API_URL) {
+  throw new Error("OpenStates API configuration is missing");
+}
+
+const openstatesApi = axios.create({
+  baseURL: OPENSTATES_API_URL,
+  headers: {
+    'X-API-KEY': OPENSTATES_API_KEY,
+  },
+});
+
+// Load sync state from file
+async function loadSyncState() {
+  try {
+    const data = await fs.readFile(SYNC_STATE_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    return {
+      lastSuccessfulSync: null,
+      lastProcessedBill: null,
+      errors: [],
+    };
+  }
+}
+
+// Save sync state to file
+async function saveSyncState(state) {
+  await fs.writeFile(SYNC_STATE_FILE, JSON.stringify(state, null, 2));
+}
+
+// Retry function with exponential backoff
+async function retryWithBackoff(fn, retries = MAX_RETRIES) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      const delay = RETRY_DELAY * Math.pow(2, i);
+      console.log(`Retry ${i + 1}/${retries} after ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
+
+async function main() {
+  try {
+    console.log('Starting bill sync...');
+    
+    // Load previous sync state
+    const syncState = await loadSyncState();
+    console.log('Previous sync state:', syncState);
+
+    // Calculate date 30 days ago
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    let page = 1;
+    let hasMore = true;
+    let processedBills = 0;
+    
+    while (hasMore) {
+      // If we have a last processed bill and we're on page 1, skip to the appropriate page
+      if (page === 1 && syncState.lastProcessedBill) {
+        console.log(`Resuming from bill: ${syncState.lastProcessedBill}`);
+      }
+
+      try {
+        await retryWithBackoff(async () => {
+          const params = new URLSearchParams();
+          params.append('q', 'firearm');
+          params.append('sort', 'updated_desc');
+          params.append('page', page.toString());
+          params.append('per_page', '1');
+          ['sponsorships', 'abstracts', 'other_titles', 'other_identifiers', 
+           'actions', 'sources', 'documents', 'versions', 'votes'].forEach(item => {
+            params.append('include', item);
+          });
+
+          const response = await openstatesApi.get('/bills?' + params.toString());
+          const { results, pagination } = response.data;
+
+          for (const bill of results) {
+            try {
+              // Skip bills we've already processed if resuming
+              if (syncState.lastProcessedBill && bill.id === syncState.lastProcessedBill) {
+                syncState.lastProcessedBill = null; // Reset so we process subsequent bills
+                continue;
+              }
+              if (syncState.lastProcessedBill) continue;
+
+              // Process bill data
+              const documents = bill.documents?.map(doc => ({
+                id: doc.id,
+                note: doc.note || null,
+                date: doc.date ? new Date(doc.date) : null,
+                links: doc.links ? JSON.stringify(doc.links) : null
+              })) || [];
+
+              const versions = bill.versions?.map(ver => ({
+                id: ver.id,
+                note: ver.note || null,
+                date: ver.date ? new Date(ver.date) : null,
+                links: ver.links ? JSON.stringify(ver.links) : null
+              })) || [];
+
+              const sources = bill.sources?.map(source => ({
+                url: source.url,
+                note: source.note || null,
+              })) || [];
+
+              const abstracts = bill.abstracts?.map(abstract => ({
+                abstract: abstract.abstract,
+                note: abstract.note || null,
+              })) || [];
+
+              const otherTitles = bill.other_titles?.map(title => ({
+                title: title.title,
+                note: title.note || null,
+              })) || [];
+
+              const otherIdentifiers = bill.other_identifiers?.map(identifier => ({
+                identifier: identifier.identifier,
+              })) || [];
+
+              const actions = bill.actions?.map(action => ({
+                id: action.id,
+                description: action.description,
+                date: action.date ? new Date(action.date) : null,
+                classification: action.classification ? JSON.stringify(action.classification) : null,
+                order: action.order || 0,
+                organization_name: action.organization?.name || null,
+              })) || [];
+
+              const sponsors = bill.sponsorships?.map(sponsor => ({
+                id: sponsor.id,
+                name: sponsor.name,
+                primary: sponsor.primary || false,
+                classification: sponsor.classification || null,
+              })) || [];
+
+              const votes = bill.votes?.map(vote => ({
+                id: vote.id,
+                identifier: vote.id,
+                motion_text: vote.motion_text || "Vote",
+                start_date: vote.start_date ? new Date(vote.start_date) : new Date(),
+                result: vote.result || "unknown",
+                counts: {
+                  createMany: {
+                    data: vote.counts?.map(count => ({
+                      vote_event_id: vote.id,  // Added vote_event_id
+                      option: count.option,
+                      value: count.value
+                    })) || []
+                  }
+                },
+                votes: {
+                  createMany: {
+                    data: vote.votes?.map(v => ({
+                      id: `${vote.id}-${v.voter_name}`,
+                      vote_event_id: vote.id,  // Added vote_event_id
+                      option: v.option,
+                      voter_name: v.voter_name,
+                      voter_id: v.voter_id || null,
+                      voter_party: v.voter_party || null
+                    })) || []
+                  }
+                }
+              })) || [];
+
+              const billData = {
+                id: bill.id,
+                identifier: bill.identifier,
+                title: bill.title || null,
+                session: bill.session || null,
+                classification: bill.classification ? JSON.stringify(bill.classification) : null,
+                subject: bill.subject ? JSON.stringify(bill.subject) : null,
+                extras: bill.extras ? JSON.stringify(bill.extras) : null,
+                openstates_url: bill.openstates_url || null,
+                first_action_date: bill.first_action_date ? new Date(bill.first_action_date) : null,
+                latest_action_date: bill.latest_action_date ? new Date(bill.latest_action_date) : null,
+                latest_action_description: bill.latest_action_description || null,
+                latest_passage_date: bill.latest_passage_date ? new Date(bill.latest_passage_date) : null,
+                jurisdiction_id: bill.jurisdiction?.id || null,
+                jurisdiction_name: bill.jurisdiction?.name || null,
+                jurisdiction_classification: bill.jurisdiction?.classification || null,
+                from_organization_id: bill.from_organization?.id || null,
+                from_organization_name: bill.from_organization?.name || null,
+                from_organization_classification: bill.from_organization?.classification || null,
+                created_at: new Date(),
+                updated_at: new Date()
+              };
+
+              try {
+                await prisma.bill.upsert({
+                  where: { id: bill.id },
+                  update: {
+                    ...billData,
+                    documents: {
+                      deleteMany: {},
+                      createMany: { data: documents }
+                    },
+                    versions: {
+                      deleteMany: {},
+                      createMany: { data: versions }
+                    },
+                    sources: {
+                      deleteMany: {},
+                      createMany: { data: sources }
+                    },
+                    abstracts: {
+                      deleteMany: {},
+                      createMany: { data: abstracts }
+                    },
+                    other_titles: {
+                      deleteMany: {},
+                      createMany: { data: otherTitles }
+                    },
+                    other_identifiers: {
+                      deleteMany: {},
+                      createMany: { data: otherIdentifiers }
+                    },
+                    actions: {
+                      deleteMany: {},
+                      createMany: { data: actions }
+                    },
+                    sponsors: {
+                      deleteMany: {},
+                      createMany: { data: sponsors }
+                    },
+                    votes: {
+                      deleteMany: {},
+                      create: votes
+                    }
+                  },
+                  create: {
+                    ...billData,
+                    documents: {
+                      createMany: { data: documents }
+                    },
+                    versions: {
+                      createMany: { data: versions }
+                    },
+                    sources: {
+                      createMany: { data: sources }
+                    },
+                    abstracts: {
+                      createMany: { data: abstracts }
+                    },
+                    other_titles: {
+                      createMany: { data: otherTitles }
+                    },
+                    other_identifiers: {
+                      createMany: { data: otherIdentifiers }
+                    },
+                    actions: {
+                      createMany: { data: actions }
+                    },
+                    sponsors: {
+                      createMany: { data: sponsors }
+                    },
+                    votes: {
+                      create: votes
+                    }
+                  }
+                });
+
+                processedBills++;
+                
+                // Save progress after each bill
+                await saveSyncState({
+                  ...syncState,
+                  lastSuccessfulSync: new Date().toISOString(),
+                  lastProcessedBill: bill.id,
+                });
+              } catch (error) {
+                console.error(`Error processing bill ${bill.id}:`, {
+                  message: error.message,
+                  details: error.stack,
+                  validationError: error.name === 'PrismaClientValidationError' ? error : undefined
+                });
+                throw error; // Let the outer catch handle state updates
+              }
+            } catch (error) {
+              // Log error but continue with next bill
+              console.error(`Error processing bill ${bill.id}:`, {
+                message: error.message,
+                details: error.stack,
+                validationError: error.name === 'PrismaClientValidationError' ? error : undefined
+              });
+              syncState.errors.push({
+                billId: bill.id,
+                error: error.message,
+                timestamp: new Date().toISOString()
+              });
+              await saveSyncState(syncState);
+            }
+          }
+
+          hasMore = page < pagination.max_page && page < 5;
+          page++;
+          
+          // Standard rate limit wait
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        });
+
+      } catch (error) {
+        console.error(`Error fetching page ${page}:`, error);
+        syncState.errors.push({
+          page,
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+        await saveSyncState(syncState);
+        
+        if (error.response?.status === 429) {
+          console.log('Rate limit hit, waiting 60 seconds...');
+          await new Promise(resolve => setTimeout(resolve, 60000));
+          page--; // Retry the same page
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    console.log(`Sync completed. Processed ${processedBills} bills.`);
+    
+    // Clear any old errors and save final state
+    await saveSyncState({
+      lastSuccessfulSync: new Date().toISOString(),
+      lastProcessedBill: null,
+      errors: []
+    });
+
+  } catch (error) {
+    console.error('Error:', error.response?.data || error.message);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+// Run the sync process
+if (require.main === module) {
+  main().catch(console.error);
+}
+
+module.exports = { main };
+
+==> scripts/sync-test.js <==
+import axios from 'axios';
+import { PrismaClient } from '@prisma/client';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const prisma = new PrismaClient();
+const OPENSTATES_API_KEY = process.env.OPENSTATES_API_KEY;
+const OPENSTATES_API_URL = process.env.OPENSTATES_API_URL;
+
+if (!OPENSTATES_API_KEY || !OPENSTATES_API_URL) {
+  throw new Error("OpenStates API configuration is missing");
+}
+
+const openstatesApi = axios.create({
+  baseURL: OPENSTATES_API_URL,
+  headers: {
+    'X-API-KEY': OPENSTATES_API_KEY,
+    'accept': 'application/json'
+  },
+});
+
+async function fetchBills() {
+  const params = new URLSearchParams();
+  params.append('q', 'firearm');
+  params.append('sort', 'updated_desc');
+  params.append('page', '1');
+  params.append('per_page', '20');
+
+  // Add each include parameter separately
+  ['sponsorships', 'abstracts', 'other_titles', 'other_identifiers', 
+   'actions', 'sources', 'documents', 'versions', 'votes'].forEach(item => {
+    params.append('include', item);
+  });
+
+  const response = await openstatesApi.get('/bills?' + params.toString());
+  return response.data.results;
+}
+
+async function main() {
+  try {
+    console.log('Starting bill sync test...');
+    
+    // Get initial count
+    const initialCount = await prisma.bill.count();
+    console.log('Initial bill count:', initialCount);
+    
+    // Fetch bills
+    console.log('Fetching bills...');
+    const bills = await fetchBills();
+    console.log(`Fetched ${bills.length} bills`);
+
+    // Process each bill
+    for (const bill of bills) {
+      console.log(`\nProcessing bill ${bill.identifier}...`);
+      
+      // Convert documents to proper format
+      const documents = bill.documents?.map(doc => ({
+        id: doc.id,
+        bill_id: bill.id,
+        note: doc.note || null,
+        date: doc.date ? new Date(doc.date) : null,
+        links: doc.links ? JSON.stringify(doc.links) : null
+      })) || [];
+
+      // Convert versions to proper format
+      const versions = bill.versions?.map(ver => ({
+        id: ver.id,
+        bill_id: bill.id,
+        note: ver.note || null,
+        date: ver.date ? new Date(ver.date) : null,
+        links: ver.links ? JSON.stringify(ver.links) : null
+      })) || [];
+
+      // Convert sources to proper format
+      const sources = bill.sources?.map((source, index) => ({
+        id: `${bill.id}-source-${index}`,
+        bill_id: bill.id,
+        url: source.url,
+        note: source.note || null,
+      })) || [];
+
+      // Convert abstracts to proper format
+      const abstracts = bill.abstracts?.map((abstract, index) => ({
+        id: `${bill.id}-abstract-${index}`,
+        bill_id: bill.id,
+        abstract: abstract.abstract,
+        note: abstract.note || null,
+      })) || [];
+
+      // Convert other titles to proper format
+      const otherTitles = bill.other_titles?.map((title, index) => ({
+        id: `${bill.id}-title-${index}`,
+        bill_id: bill.id,
+        title: title.title,
+        note: title.note || null,
+      })) || [];
+
+      // Convert other identifiers to proper format
+      const otherIdentifiers = bill.other_identifiers?.map((identifier, index) => ({
+        id: `${bill.id}-identifier-${index}`,
+        bill_id: bill.id,
+        identifier: identifier.identifier,
+      })) || [];
+
+      // Basic bill data
+      const billData = {
+        id: bill.id,
+        identifier: bill.identifier,
+        title: bill.title || null,
+        session: bill.session || null,
+        classification: bill.classification ? JSON.stringify(bill.classification) : null,
+        subject: bill.subject ? JSON.stringify(bill.subject) : null,
+        extras: bill.extras ? JSON.stringify(bill.extras) : null,
+        openstates_url: bill.openstates_url || null,
+        first_action_date: bill.first_action_date ? new Date(bill.first_action_date) : null,
+        latest_action_date: bill.latest_action_date ? new Date(bill.latest_action_date) : null,
+        latest_action_description: bill.latest_action_description || null,
+        latest_passage_date: bill.latest_passage_date ? new Date(bill.latest_passage_date) : null,
+        jurisdiction_id: bill.jurisdiction?.id || null,
+        jurisdiction_name: bill.jurisdiction?.name || null,
+        jurisdiction_classification: bill.jurisdiction?.classification || null,
+        from_organization_id: bill.from_organization?.id || null,
+        from_organization_name: bill.from_organization?.name || null,
+        from_organization_classification: bill.from_organization?.classification || null,
+      };
+
+      // Upsert the bill with its documents and versions
+      await prisma.bill.upsert({
+        where: { id: bill.id },
+        update: {
+          ...billData,
+          documents: {
+            deleteMany: {},
+            createMany: {
+              data: documents
+            }
+          },
+          versions: {
+            deleteMany: {},
+            createMany: {
+              data: versions
+            }
+          },
+          sources: {
+            deleteMany: {},
+            createMany: {
+              data: sources
+            }
+          },
+          abstracts: {
+            deleteMany: {},
+            createMany: {
+              data: abstracts
+            }
+          },
+          other_titles: {
+            deleteMany: {},
+            createMany: {
+              data: otherTitles
+            }
+          },
+          other_identifiers: {
+            deleteMany: {},
+            createMany: {
+              data: otherIdentifiers
+            }
+          }
+        },
+        create: {
+          ...billData,
+          documents: {
+            createMany: {
+              data: documents
+            }
+          },
+          versions: {
+            createMany: {
+              data: versions
+            }
+          },
+          sources: {
+            createMany: {
+              data: sources
+            }
+          },
+          abstracts: {
+            createMany: {
+              data: abstracts
+            }
+          },
+          other_titles: {
+            createMany: {
+              data: otherTitles
+            }
+          },
+          other_identifiers: {
+            createMany: {
+              data: otherIdentifiers
+            }
+          }
+        }
+      });
+
+      console.log(`Processed bill ${bill.identifier} with:
+        - ${documents.length} documents
+        - ${versions.length} versions
+        - ${sources.length} sources
+        - ${abstracts.length} abstracts
+        - ${otherTitles.length} other titles
+        - ${otherIdentifiers.length} other identifiers`);
+    }
+    
+    // Get final count
+    const finalCount = await prisma.bill.count();
+    console.log('\nFinal bill count:', finalCount);
+    
+    // Check for bills with documents
+    const billWithDocs = await prisma.bill.findFirst({
+      where: {
+        documents: {
+          some: {}
+        }
+      },
+      include: {
+        documents: true,
+        versions: true
+      }
+    });
+
+    if (billWithDocs) {
+      console.log('\nFound bill with documents:', {
+        id: billWithDocs.id,
+        identifier: billWithDocs.identifier,
+        documentCount: billWithDocs.documents.length,
+        versionCount: billWithDocs.versions.length,
+        sampleDocument: billWithDocs.documents[0]
+      });
+    } else {
+      console.log('\nNo bills found with documents');
+    }
+
+  } catch (error) {
+    console.error('Test failed:', error);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+main();
+
+==> scripts/test-api.js <==
+import axios from 'axios';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const OPENSTATES_API_KEY = process.env.OPENSTATES_API_KEY;
+const OPENSTATES_API_URL = process.env.OPENSTATES_API_URL;
+
+if (!OPENSTATES_API_KEY || !OPENSTATES_API_URL) {
+  throw new Error("OpenStates API configuration is missing");
+}
+
+const openstatesApi = axios.create({
+  baseURL: OPENSTATES_API_URL,
+  headers: {
+    'X-API-KEY': OPENSTATES_API_KEY,
+    'accept': 'application/json'
+  },
+});
+
+async function testApi() {
+  try {
+    console.log('Testing OpenStates API...');
+    
+    // Use exact format from working curl command
+    const params = new URLSearchParams();
+    params.append('jurisdiction', 'TN');
+    params.append('sort', 'updated_desc');
+    params.append('q', 'firearm');
+
+    // Add each include parameter separately
+    ['sponsorships', 'abstracts', 'other_titles', 'other_identifiers', 
+     'actions', 'sources', 'documents', 'versions', 'votes'].forEach(item => {
+      params.append('include', item);
+    });
+
+    params.append('page', '1');
+    params.append('per_page', '5');
+
+    const url = '/bills?' + params.toString();
+    console.log('\nAttempting request to:', url);
+
+    const response = await openstatesApi.get(url);
+
+    console.log('\nAPI Response Structure:', {
+      status: response.status,
+      totalResults: response.data.results?.length,
+      pagination: response.data.pagination,
+      sampleBill: response.data.results?.[0] ? {
+        id: response.data.results[0].id,
+        identifier: response.data.results[0].identifier,
+        availableFields: Object.keys(response.data.results[0]),
+        hasDocuments: Boolean(response.data.results[0].documents),
+        documentsCount: response.data.results[0].documents?.length || 0
+      } : null
+    });
+
+    // Log full sample bill for inspection
+    if (response.data.results?.[0]) {
+      console.log('\nFull Sample Bill:', JSON.stringify(response.data.results[0], null, 2));
+    }
+
+  } catch (error) {
+    console.error('\nAPI Error:', {
+      status: error.response?.status,
+      message: error.response?.data?.message || error.message,
+      details: JSON.stringify(error.response?.data, null, 2)
+    });
+
+    // Log the attempted request details
+    if (error.config) {
+      console.log('\nAttempted Request:', {
+        url: error.config.url,
+        method: error.config.method,
+        headers: {
+          ...error.config.headers,
+          'X-API-KEY': '[REDACTED]'
+        }
+      });
+    }
+  }
+}
+
+testApi();
+
+==> tailwind.config.ts <==
+import type { Config } from "tailwindcss";
+
+const config = {
+  darkMode: ["class"],
+  content: [
+    "./pages/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+    "./app/**/*.{ts,tsx}",
+    "./src/**/*.{ts,tsx}",
+  ],
+  prefix: "",
+  theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
+    extend: {
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+      },
+    },
+  },
+  plugins: [require("tailwindcss-animate")],
+} satisfies Config;
+
+export default config;
+
+==> tsconfig.json <==
+{
+  "compilerOptions": {
+    "target": "es5",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./app/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

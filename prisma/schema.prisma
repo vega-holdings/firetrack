@@ -8,6 +8,74 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model CongressBill {
+  id                String    @id
+  congress          Int       // e.g., 118 for 118th Congress
+  type             String    // e.g., "HR" for House Resolution
+  number           Int       // Bill number
+  title            String?
+  shortTitle       String?
+  introducedDate   DateTime?
+  originChamber    String?   // "House" or "Senate"
+  status           String?   // INTRODUCED, IN_COMMITTEE, PASSED_COMMITTEE, etc.
+  policyArea       String?
+  subjects         String?   // Stored as JSON string
+  summary          String?   // Latest summary text
+  latestActionDate DateTime?
+  latestActionText String?
+  
+  // Relations
+  sponsors         CongressSponsor[]
+  actions          CongressAction[]
+  committees       CongressCommittee[]
+  
+  // Timestamps
+  created_at       DateTime   @default(now())
+  updated_at       DateTime   @updatedAt
+
+  @@map("congress_bills")
+}
+
+model CongressSponsor {
+  id              String    @id
+  bill_id         String
+  bioguideId      String?
+  name            String
+  state           String?
+  party           String?
+  district        String?
+  sponsorType     String?   // "Primary" or "Cosponsor"
+  bill            CongressBill @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("congress_sponsors")
+}
+
+model CongressAction {
+  id              String    @id
+  bill_id         String
+  actionDate      DateTime
+  text            String
+  type            String?
+  actionCode      String?
+  sourceSystem    String?
+  actionChamber   String?
+  bill            CongressBill @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("congress_actions")
+}
+
+model CongressCommittee {
+  id              String    @id
+  bill_id         String
+  name            String
+  chamber         String
+  type            String?   // "Standing", "Joint", etc.
+  activity        String?   // Committee's activity on the bill
+  bill            CongressBill @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("congress_committees")
+}
+
 model Bill {
   id                             String    @id
   identifier                     String
@@ -56,11 +124,14 @@ model Bill {
 }
 
 model Sponsor {
-  id        String   @id
-  bill_id   String
-  name      String
-  primary   Boolean?
-  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+  id             String   @id
+  bill_id        String
+  name           String
+  primary        Boolean?
+  classification String?
+  party          String?
+  title          String?
+  bill           Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
 
   @@map("sponsors")
 }

@@ -1,16 +1,19 @@
 "use client";
 
 import { syncBillsFromAPI } from "@/lib/actions/bill-actions";
-import { useState } from "react";
+import { useSync } from "@/lib/store";
 
 export function SyncButton() {
-  const [syncing, setSyncing] = useState(false);
+  const { isSyncing, setSyncing, updateSyncStats } = useSync();
 
   const handleSync = async () => {
+    if (isSyncing) return;
     setSyncing(true);
     try {
-      await syncBillsFromAPI();
-      // Could add a toast notification here
+      const result = await syncBillsFromAPI();
+      if (result.success) {
+        updateSyncStats(result.data?.totalSynced || 0);
+      }
     } catch (error) {
       console.error("Failed to sync bills:", error);
     } finally {
@@ -22,9 +25,9 @@ export function SyncButton() {
     <button
       className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
       onClick={handleSync}
-      disabled={syncing}
+      disabled={isSyncing}
     >
-      {syncing ? "Syncing..." : "Sync Bills"}
+      {isSyncing ? "Syncing..." : "Sync Bills"}
     </button>
   );
 }

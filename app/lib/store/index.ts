@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 interface FilterState {
+  jurisdiction: "federal" | "state" | "all" | null;
   state: string | null;
   status: string | null;
   searchQuery: string;
@@ -9,14 +10,23 @@ interface FilterState {
   limit: number;
 }
 
+interface SyncState {
+  isSyncing: boolean;
+  lastSyncTime: string | null;
+  totalBillsSynced: number;
+}
+
 interface UIState {
   sidebarOpen: boolean;
   selectedBillId: string | null;
   filters: FilterState;
   darkMode: boolean;
+  sync: SyncState;
 }
 
 interface UIActions {
+  setSyncing: (isSyncing: boolean) => void;
+  updateSyncStats: (totalBills: number) => void;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
   setSelectedBill: (billId: string | null) => void;
@@ -26,6 +36,7 @@ interface UIActions {
 }
 
 const initialFilters: FilterState = {
+  jurisdiction: "all",
   state: null,
   status: null,
   searchQuery: '',
@@ -41,8 +52,30 @@ export const useStore = create<UIState & UIActions>()(
       selectedBillId: null,
       filters: initialFilters,
       darkMode: false,
+      sync: {
+        isSyncing: false,
+        lastSyncTime: null,
+        totalBillsSynced: 0,
+      },
 
       // Actions
+      setSyncing: (isSyncing: boolean) =>
+        set((state) => ({
+          sync: {
+            ...state.sync,
+            isSyncing,
+            ...(isSyncing ? {} : { lastSyncTime: new Date().toISOString() }),
+          },
+        })),
+
+      updateSyncStats: (totalBills: number) =>
+        set((state) => ({
+          sync: {
+            ...state.sync,
+            totalBillsSynced: totalBills,
+          },
+        })),
+
       toggleSidebar: () =>
         set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       
@@ -92,4 +125,10 @@ export const useSelectedBill = () => useStore((state) => ({
 export const useDarkMode = () => useStore((state) => ({
   darkMode: state.darkMode,
   toggle: state.toggleDarkMode,
+}));
+
+export const useSync = () => useStore((state) => ({
+  ...state.sync,
+  setSyncing: state.setSyncing,
+  updateSyncStats: state.updateSyncStats,
 }));

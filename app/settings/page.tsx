@@ -1,4 +1,5 @@
 import { SyncButton } from "@/components/SyncButton";
+import { SyncStatus } from "@/components/SyncStatus";
 
 export default function SettingsPage() {
   return (
@@ -11,7 +12,10 @@ export default function SettingsPage() {
           <p className="text-sm text-muted-foreground mb-4">
             Sync the latest firearms legislation data from OpenStates API. This will fetch bills from the last 30 days.
           </p>
-          <SyncButton />
+          <div className="space-y-4">
+            <SyncButton />
+            <SyncStatus />
+          </div>
         </div>
       </div>
     </div>

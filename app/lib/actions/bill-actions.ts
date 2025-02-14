@@ -24,8 +24,37 @@ if (!OPENSTATES_API_KEY || !OPENSTATES_API_URL) {
   throw new Error("OpenStates API configuration is missing");
 }
 
+// Rate limiting configuration
+const RATE_LIMIT = {
+  dailyLimit: 250,
+  requestsPerMinute: 10,
+  delayBetweenRequests: 6000, // 6 seconds between requests (10 per minute)
+  retryDelay: 60000, // 1 minute wait on rate limit
+};
+
+let dailyRequestCount = 0;
+const resetTime = new Date();
+resetTime.setHours(0, 0, 0, 0); // Reset at midnight
+
 // Rate limiter
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Check and increment daily request count
+function checkDailyLimit() {
+  const now = new Date();
+  if (now.getTime() > resetTime.getTime() + 24 * 60 * 60 * 1000) {
+    // Reset counter if it's a new day
+    dailyRequestCount = 0;
+    resetTime.setTime(now.getTime());
+    resetTime.setHours(0, 0, 0, 0);
+  }
+  
+  if (dailyRequestCount >= RATE_LIMIT.dailyLimit) {
+    throw new Error(`Daily API limit of ${RATE_LIMIT.dailyLimit} requests exceeded`);
+  }
+  
+  dailyRequestCount++;
+}
 
 // OpenStates API client
 const openstatesApi = axios.create({
@@ -35,199 +64,213 @@ const openstatesApi = axios.create({
   },
 });
 
-// Fetch bills from OpenStates API with pagination
-async function fetchFromLegislativeAPI() {
-  try {
-    // Calculate date 30 days ago
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const formattedDate = thirtyDaysAgo.toISOString().split('T')[0];
+// Map of US States to their OpenStates jurisdiction IDs
+const STATE_IDS: Record<string, string> = {
+  'Alabama': 'al',
+  'Alaska': 'ak',
+  'Arizona': 'az',
+  'Arkansas': 'ar',
+  'California': 'ca',
+  'Colorado': 'co',
+  'Connecticut': 'ct',
+  'Delaware': 'de',
+  'Florida': 'fl',
+  'Georgia': 'ga',
+  'Hawaii': 'hi',
+  'Idaho': 'id',
+  'Illinois': 'il',
+  'Indiana': 'in',
+  'Iowa': 'ia',
+  'Kansas': 'ks',
+  'Kentucky': 'ky',
+  'Louisiana': 'la',
+  'Maine': 'me',
+  'Maryland': 'md',
+  'Massachusetts': 'ma',
+  'Michigan': 'mi',
+  'Minnesota': 'mn',
+  'Mississippi': 'ms',
+  'Missouri': 'mo',
+  'Montana': 'mt',
+  'Nebraska': 'ne',
+  'Nevada': 'nv',
+  'New Hampshire': 'nh',
+  'New Jersey': 'nj',
+  'New Mexico': 'nm',
+  'New York': 'ny',
+  'North Carolina': 'nc',
+  'North Dakota': 'nd',
+  'Ohio': 'oh',
+  'Oklahoma': 'ok',
+  'Oregon': 'or',
+  'Pennsylvania': 'pa',
+  'Rhode Island': 'ri',
+  'South Carolina': 'sc',
+  'South Dakota': 'sd',
+  'Tennessee': 'tn',
+  'Texas': 'tx',
+  'Utah': 'ut',
+  'Vermont': 'vt',
+  'Virginia': 'va',
+  'Washington': 'wa',
+  'West Virginia': 'wv',
+  'Wisconsin': 'wi',
+  'Wyoming': 'wy'
+};
 
-    const allBills: any[] = [];
-    let page = 1;
-    let hasMore = true;
+// US States in alphabetical order
+const US_STATES = Object.keys(STATE_IDS).sort();
 
-    while (hasMore) {
-      // Rate limiting: wait 1 second between requests
-      if (page > 1) {
-        await sleep(1000);
-      }
+// Process a single bill and save to database
+export async function processBill(bill: any, state: string) {
+  console.log(`[Sync] ${state}: Processing bill ${bill.id}...`);
+  
+  // Convert documents to proper format
+  const documents = bill.documents?.map((doc: BillDocumentOrVersion) => ({
+    id: doc.id,
+    note: doc.note || null,
+    date: doc.date ? new Date(doc.date) : null,
+    links: doc.links ? JSON.stringify(doc.links) : null
+  })) || [];
 
-      try {
-        // Build URL parameters
-        const params = new URLSearchParams();
-        params.append('q', 'firearm');
-        params.append('sort', 'updated_desc');
-        params.append('page', page.toString());
-        params.append('per_page', '20');
+  // Convert versions to proper format
+  const versions = bill.versions?.map((ver: BillDocumentOrVersion) => ({
+    id: ver.id,
+    note: ver.note || null,
+    date: ver.date ? new Date(ver.date) : null,
+    links: ver.links ? JSON.stringify(ver.links) : null
+  })) || [];
 
-        // Add each include parameter separately
-        ['sponsorships', 'abstracts', 'other_titles', 'other_identifiers', 
-         'actions', 'sources', 'documents', 'versions', 'votes'].forEach(item => {
-          params.append('include', item);
-        });
+  // Process all bill data
+  const billData = {
+    id: bill.id,
+    identifier: bill.identifier,
+    title: bill.title || null,
+    session: bill.session || null,
+    classification: bill.classification ? JSON.stringify(bill.classification) : null,
+    subject: bill.subject ? JSON.stringify(bill.subject) : null,
+    extras: bill.extras ? JSON.stringify(bill.extras) : null,
+    openstates_url: bill.openstates_url || null,
+    first_action_date: bill.first_action_date ? new Date(bill.first_action_date) : null,
+    latest_action_date: bill.latest_action_date ? new Date(bill.latest_action_date) : null,
+    latest_action_description: bill.latest_action_description || null,
+    latest_passage_date: bill.latest_passage_date ? new Date(bill.latest_passage_date) : null,
+    jurisdiction_id: bill.jurisdiction?.id || null,
+    jurisdiction_name: bill.jurisdiction?.name || null,
+    jurisdiction_classification: bill.jurisdiction?.classification || null,
+    from_organization_id: bill.from_organization?.id || null,
+    from_organization_name: bill.from_organization?.name || null,
+    from_organization_classification: bill.from_organization?.classification || null,
+  };
 
-        const response = await openstatesApi.get('/bills?' + params.toString());
+  // Process related data
+  const actions = bill.actions?.map((action: { 
+    id: string;
+    organization: { name?: string };
+    description: string;
+    date: string;
+    classification: string[];
+    order: number;
+  }) => ({
+    id: action.id,
+    description: action.description,
+    date: action.date ? new Date(action.date) : null,
+    classification: action.classification ? JSON.stringify(action.classification) : null,
+    order: action.order || 0, // Default to 0 if order is null
+    organization_name: action.organization?.name || null,
+  })) || [];
 
-        const { results, pagination } = response.data;
-        allBills.push(...results);
+  const sponsors = bill.sponsorships?.map((sponsor: BillSponsorship) => ({
+    id: sponsor.id,
+    name: sponsor.name,
+    primary: sponsor.primary || false,
+    classification: sponsor.classification || null,
+    party: sponsor.party || null,
+    title: sponsor.title || null,
+  })) || [];
 
-        // Check if we have more pages
-        hasMore = page < pagination.max_page && page < 5; // Limit to 100 bills (5 pages * 20 per page)
-        page++;
-
-      } catch (error) {
-        if (axios.isAxiosError(error) && error.response?.status === 429) {
-          console.log('Rate limit hit, waiting 60 seconds...');
-          await sleep(60000); // Wait 60 seconds
-          page--; // Retry the same page
-          continue;
-        }
-        throw error;
-      }
-
-      // Standard rate limit wait between successful requests
-      await sleep(1000);
-    }
-
-    return {
-      bills: allBills,
-    };
-  } catch (error) {
-    console.error('Failed to fetch from OpenStates:', error);
-    throw error;
+  interface VoteCount {
+    option: string;
+    value: number;
   }
-}
 
-// Server action to fetch and sync bills
-export async function syncBillsFromAPI() {
+  interface Vote {
+    id: string;
+    option: string;
+    voter_name: string;
+    voter_id: string | null;
+    voter_party: string | null;
+  }
+
+  interface ProcessedVoteEvent {
+    id: string;
+    identifier: string;
+    motion_text: string;
+    start_date: Date | null;
+    result: string;
+    counts: VoteCount[];
+    votes: Vote[];
+  }
+
+  // Process votes from API response
+  const votes = bill.votes?.map((apiVote: { 
+    id: string;
+    organization?: Organization;
+    motion_text?: string;
+    start_date?: string;
+    result?: string;
+    counts: { option: string; value: number }[];
+    votes: { option: string; voter_name: string; voter_id?: string; voter_party?: string }[];
+  }) => ({
+    id: apiVote.id,
+    identifier: apiVote.id,
+    motion_text: apiVote.motion_text || "Vote",
+    start_date: apiVote.start_date ? new Date(apiVote.start_date) : null,
+    result: apiVote.result || "unknown",
+    counts: apiVote.counts?.map(count => ({
+      option: count.option,
+      value: count.value
+    })) || [],
+    votes: apiVote.votes?.map(v => ({
+      id: `${apiVote.id}-${v.voter_name}`,
+      option: v.option,
+      voter_name: v.voter_name,
+      voter_id: v.voter_id || null,
+      voter_party: v.voter_party || null
+    })) || []
+  })) || [];
+
+  const sources = bill.sources?.map((source: { url: string; note?: string }) => ({
+    url: source.url,
+    note: source.note || null,
+  })) || [];
+
+  const abstracts = bill.abstracts?.map((abstract: { abstract: string; note?: string }) => ({
+    abstract: abstract.abstract,
+    note: abstract.note || null,
+  })) || [];
+
+  const otherTitles = bill.other_titles?.map((title: { title: string; note?: string }) => ({
+    title: title.title,
+    note: title.note || null,
+  })) || [];
+
+  const otherIdentifiers = bill.other_identifiers?.map((identifier: { 
+    identifier: string; 
+    note?: string;
+    scheme?: string;
+  }) => ({
+    identifier: identifier.identifier,
+    note: identifier.note || null,
+    scheme: identifier.scheme || null,
+  })) || [];
+
   try {
-    const apiResponse = await fetchFromLegislativeAPI();
-    console.log('API Response:', JSON.stringify(apiResponse.bills[0], null, 2));
+    console.log(`[Sync] ${state}: Saving bill ${bill.id} to database...`);
     
-    for (const bill of apiResponse.bills) {
-      console.log('Processing bill:', bill.id);
-      console.log('Documents:', bill.documents?.length || 0);
-      
-      // Convert documents to proper format
-      const documents = bill.documents?.map((doc: BillDocumentOrVersion) => ({
-        id: doc.id,
-        note: doc.note || null,
-        date: doc.date ? new Date(doc.date) : null,
-        links: doc.links ? JSON.stringify(doc.links) : null
-      })) || [];
-
-      // Convert versions to proper format
-      const versions = bill.versions?.map((ver: BillDocumentOrVersion) => ({
-        id: ver.id,
-        note: ver.note || null,
-        date: ver.date ? new Date(ver.date) : null,
-        links: ver.links ? JSON.stringify(ver.links) : null
-      })) || [];
-
-      // Process all bill data
-      const billData = {
-        id: bill.id,
-        identifier: bill.identifier,
-        title: bill.title || null,
-        session: bill.session || null,
-        classification: bill.classification ? JSON.stringify(bill.classification) : null,
-        subject: bill.subject ? JSON.stringify(bill.subject) : null,
-        extras: bill.extras ? JSON.stringify(bill.extras) : null,
-        openstates_url: bill.openstates_url || null,
-        first_action_date: bill.first_action_date ? new Date(bill.first_action_date) : null,
-        latest_action_date: bill.latest_action_date ? new Date(bill.latest_action_date) : null,
-        latest_action_description: bill.latest_action_description || null,
-        latest_passage_date: bill.latest_passage_date ? new Date(bill.latest_passage_date) : null,
-        jurisdiction_id: bill.jurisdiction?.id || null,
-        jurisdiction_name: bill.jurisdiction?.name || null,
-        jurisdiction_classification: bill.jurisdiction?.classification || null,
-        from_organization_id: bill.from_organization?.id || null,
-        from_organization_name: bill.from_organization?.name || null,
-        from_organization_classification: bill.from_organization?.classification || null,
-      };
-
-      // Process related data
-      const actions = bill.actions?.map((action: { 
-        id: string;
-        organization: { name?: string };
-        description: string;
-        date: string;
-        classification: string[];
-        order: number;
-      }) => ({
-        id: action.id,
-        bill_id: bill.id,
-        description: action.description,
-        date: action.date ? new Date(action.date) : null,
-        classification: action.classification ? JSON.stringify(action.classification) : null,
-        order: action.order || null,
-        organization_name: action.organization?.name || null,
-      })) || [];
-
-      const sponsors = bill.sponsorships?.map((sponsor: BillSponsorship) => ({
-        id: sponsor.id,
-        bill_id: bill.id,
-        name: sponsor.name,
-        primary: sponsor.primary || false,
-        classification: sponsor.classification || null,
-      })) || [];
-
-      const votes = bill.votes?.map((vote: { 
-        id: string;
-        organization?: Organization;
-        motion_text?: string;
-        start_date?: string;
-        result?: string;
-        counts: { option: string; value: number }[];
-        votes: { option: string; voter_name: string; voter_id?: string; voter_party?: string }[];
-      }) => ({
-        id: vote.id,
-        bill_id: bill.id,
-        organization_id: vote.organization?.id || null,
-        organization_name: vote.organization?.name || null,
-        motion_text: vote.motion_text || null,
-        start_date: vote.start_date ? new Date(vote.start_date) : null,
-        result: vote.result || null,
-        counts: vote.counts || [],
-        votes: vote.votes || [],
-      })) || [];
-
-      const sources = bill.sources?.map((source: { url: string; note?: string }, index: number) => ({
-        id: `${bill.id}-source-${index}`,
-        bill_id: bill.id,
-        url: source.url,
-        note: source.note || null,
-      })) || [];
-
-      const abstracts = bill.abstracts?.map((abstract: { abstract: string; note?: string }, index: number) => ({
-        id: `${bill.id}-abstract-${index}`,
-        bill_id: bill.id,
-        abstract: abstract.abstract,
-        note: abstract.note || null,
-      })) || [];
-
-      const otherTitles = bill.other_titles?.map((title: { title: string; note?: string }, index: number) => ({
-        id: `${bill.id}-title-${index}`,
-        bill_id: bill.id,
-        title: title.title,
-        note: title.note || null,
-      })) || [];
-
-      const otherIdentifiers = bill.other_identifiers?.map((identifier: { 
-        identifier: string; 
-        note?: string;
-        scheme?: string;
-      }, index: number) => ({
-        id: `${bill.id}-identifier-${index}`,
-        bill_id: bill.id,
-        identifier: identifier.identifier,
-        note: identifier.note || null,
-        scheme: identifier.scheme || null,
-      })) || [];
-
-      // Upsert bill and all related data
-      await db.bill.upsert({
+    // Use a transaction to ensure atomic operations
+    return await db.$transaction(async (prisma) => {
+      await prisma.bill.upsert({
         where: { id: billData.id },
         update: {
           ...billData,
@@ -249,13 +292,30 @@ export async function syncBillsFromAPI() {
           },
           votes: {
             deleteMany: {},
-            create: votes.map((vote: typeof votes[0]) => ({
-              ...vote,
+            create: votes.map((vote: ProcessedVoteEvent) => ({
+              id: vote.id,
+              identifier: vote.identifier,
+              motion_text: vote.motion_text,
+              start_date: vote.start_date,
+              result: vote.result,
               counts: {
-                createMany: { data: vote.counts }
+                createMany: {
+                  data: vote.counts.map((count: VoteCount) => ({
+                    option: count.option,
+                    value: count.value
+                  }))
+                }
               },
               votes: {
-                createMany: { data: vote.votes }
+                createMany: {
+                  data: vote.votes.map((v: Vote) => ({
+                    id: v.id,
+                    option: v.option,
+                    voter_name: v.voter_name,
+                    voter_id: v.voter_id,
+                    voter_party: v.voter_party
+                  }))
+                }
               }
             }))
           },
@@ -291,13 +351,30 @@ export async function syncBillsFromAPI() {
             createMany: { data: versions }
           },
           votes: {
-            create: votes.map((vote: typeof votes[0]) => ({
-              ...vote,
+            create: votes.map((vote: ProcessedVoteEvent) => ({
+              id: vote.id,
+              identifier: vote.identifier,
+              motion_text: vote.motion_text,
+              start_date: vote.start_date,
+              result: vote.result,
               counts: {
-                createMany: { data: vote.counts }
+                createMany: {
+                  data: vote.counts.map((count: VoteCount) => ({
+                    option: count.option,
+                    value: count.value
+                  }))
+                }
               },
               votes: {
-                createMany: { data: vote.votes }
+                createMany: {
+                  data: vote.votes.map((v: Vote) => ({
+                    id: v.id,
+                    option: v.option,
+                    voter_name: v.voter_name,
+                    voter_id: v.voter_id,
+                    voter_party: v.voter_party
+                  }))
+                }
               }
             }))
           },
@@ -315,13 +392,158 @@ export async function syncBillsFromAPI() {
           }
         }
       });
+
+      return true;
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error(`[Sync] ${state}: Error saving bill ${bill.id}:`, {
+        message: error.message,
+        stack: error.stack,
+        details: JSON.stringify(error, null, 2)
+      });
+    } else {
+      console.error(`[Sync] ${state}: Unknown error saving bill ${bill.id}:`, error);
+    }
+    return false;
+  }
+}
+
+async function fetchFromLegislativeAPI(state: string) {
+  try {
+    console.log(`[Sync] Starting fetch for ${state}...`);
+    
+    // Calculate date 14 days ago
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+    const formattedDate = twoWeeksAgo.toISOString().split('T')[0];
+
+    let page = 1;
+    let hasMore = true;
+    let totalProcessed = 0;
+    let successfulSaves = 0;
+
+    while (hasMore) {
+      console.log(`[Sync] ${state}: Fetching page ${page}...`);
+      
+      // Rate limiting: wait 1 second between requests
+      if (page > 1) {
+        await sleep(1000);
+      }
+
+      try {
+        // Build URL parameters
+        const params = new URLSearchParams();
+        params.append('q', 'firearm');
+        params.append('jurisdiction', STATE_IDS[state]);
+        params.append('sort', 'updated_desc');
+        params.append('page', page.toString());
+        params.append('per_page', '20');
+        params.append('updated_since', formattedDate);
+
+        // Add each include parameter separately
+        ['sponsorships', 'abstracts', 'other_titles', 'other_identifiers', 
+         'actions', 'sources', 'documents', 'versions', 'votes'].forEach(item => {
+          params.append('include', item);
+        });
+
+        // Check daily limit before making request
+        checkDailyLimit();
+        const response = await openstatesApi.get('/bills?' + params.toString());
+        console.log(`[Sync] API Requests Today: ${dailyRequestCount}/${RATE_LIMIT.dailyLimit}`);
+        const { results, pagination } = response.data;
+        
+        console.log(`[Sync] ${state}: Found ${results.length} bills on page ${page}`);
+
+        // Process and save each bill immediately
+        for (const bill of results) {
+          const success = await processBill(bill, state);
+          if (success) successfulSaves++;
+          totalProcessed++;
+        }
+
+        // Check if we have more pages
+        hasMore = page < pagination.max_page && page < 5; // Limit to 100 bills (5 pages * 20 per page)
+        page++;
+
+      } catch (error) {
+        if (axios.isAxiosError(error) && error.response?.status === 429) {
+          console.log(`[Sync] ${state}: Rate limit hit, waiting 60 seconds...`);
+          await sleep(60000); // Wait 60 seconds
+          page--; // Retry the same page
+          continue;
+        }
+        console.error(`[Sync] ${state}: Error fetching bills:`, error);
+        // Don't throw error, return what we have so far
+        hasMore = false;
+      }
+
+      // Standard rate limit wait between successful requests
+      await sleep(1000);
     }
 
+    console.log(`[Sync] ${state}: Completed with ${successfulSaves}/${totalProcessed} bills saved`);
+    return {
+      bills: totalProcessed,
+      saved: successfulSaves,
+      state,
+    };
+  } catch (error) {
+    console.error('Failed to fetch from OpenStates:', error);
+    throw error;
+  }
+}
+
+import { syncFederalBills } from "./congress-actions";
+
+// Server action to fetch and sync bills
+export async function syncBillsFromAPI() {
+  try {
+    let totalBills = 0;
+    let totalSaved = 0;
+    
+    // First sync federal bills
+    console.log("[Sync] Starting federal bills sync...");
+    const federalResult = await syncFederalBills();
+    if (federalResult.success) {
+      totalBills += federalResult.data.totalSynced;
+      totalSaved += federalResult.data.totalSynced;
+    }
+    
+    // Then process each state sequentially
+    for (const state of US_STATES) {
+      try {
+        const result = await fetchFromLegislativeAPI(state);
+        totalBills += result.bills;
+        totalSaved += result.saved;
+
+        // Add a delay between states to prevent rate limiting
+        await sleep(2000);
+        
+      } catch (error) {
+        console.error(`[Sync] Error processing ${state}:`, error);
+        // Continue with next state even if one fails
+      }
+    }
+
+    console.log(`[Sync] Completed all states. Bills processed: ${totalBills}, Successfully saved: ${totalSaved}`);
+    
     revalidatePath("/bills");
-    return { success: true };
+    return { 
+      success: true,
+      data: {
+        totalSynced: totalSaved
+      }
+    };
   } catch (error) {
     console.error("Failed to sync bills:", error);
-    return { success: false, error: "Failed to sync bills" };
+    return { 
+      success: false, 
+      error: "Failed to sync bills",
+      data: {
+        totalSynced: 0
+      }
+    };
   }
 }
 
@@ -346,8 +568,17 @@ export async function searchBills(formData: FormData): Promise<SearchBillsRespon
               ],
             }
           : {},
-        parsed.state ? { jurisdiction_name: parsed.state } : {},
-        parsed.status ? { latest_action_description: { contains: parsed.status } } : {},
+        parsed.jurisdiction === "federal"
+          ? { jurisdiction_classification: "federal" }
+          : parsed.jurisdiction === "state"
+          ? { jurisdiction_classification: { not: "federal" } }
+          : {},
+        parsed.state && parsed.jurisdiction !== "federal"
+          ? { jurisdiction_name: parsed.state }
+          : {},
+        parsed.status
+          ? { latest_action_description: { contains: parsed.status } }
+          : {},
       ],
     };
 

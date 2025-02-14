@@ -36,13 +36,19 @@ export function FilterPanel() {
   const { setFilter } = useStore();
 
   const handleFilterChange = useCallback(async (key: string, value: string) => {
+    // If changing jurisdiction to federal, clear state filter
+    if (key === "jurisdiction" && value === "federal") {
+      setFilter("state", null);
+    }
+    
     setFilter(key as keyof typeof filters, value || null);
     
     // Create FormData with current filters
     const formData = new FormData();
-    formData.append("state", value || "");
-    formData.append("status", filters.status || "");
-    formData.append("query", filters.searchQuery || "");
+    formData.append("jurisdiction", key === "jurisdiction" ? value : filters.jurisdiction || "all");
+    formData.append("state", key === "state" ? value : filters.state || "");
+    formData.append("status", key === "status" ? value : filters.status || "");
+    formData.append("query", key === "searchQuery" ? value : filters.searchQuery || "");
     formData.append("page", "1");
     formData.append("limit", filters.limit.toString());
 
@@ -56,21 +62,39 @@ export function FilterPanel() {
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">
-            State
+            Jurisdiction
           </label>
           <select
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            value={filters.state || ""}
-            onChange={(e) => handleFilterChange("state", e.target.value)}
+            value={filters.jurisdiction || "all"}
+            onChange={(e) => handleFilterChange("jurisdiction", e.target.value)}
           >
-            <option value="">All States</option>
-            {STATES.map((state) => (
-              <option key={state} value={state}>
-                {state}
-              </option>
-            ))}
+            <option value="all">All Jurisdictions</option>
+            <option value="federal">Federal</option>
+            <option value="state">State</option>
           </select>
         </div>
+        
+        {filters.jurisdiction !== "federal" && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              State
+            </label>
+            <select
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              value={filters.state || ""}
+              onChange={(e) => handleFilterChange("state", e.target.value)}
+            >
+              <option value="">All States</option>
+              {STATES.map((state) => (
+                <option key={state} value={state}>
+                  {state}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-gray-700">
             Status
@@ -88,6 +112,7 @@ export function FilterPanel() {
             ))}
           </select>
         </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700">
             Search

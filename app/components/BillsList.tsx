@@ -50,13 +50,16 @@ export function BillsList({ initialBills }: BillsListProps) {
 
       const result = await searchBills(formData);
       if (result.success && result.data?.bills) {
+        const { bills, pagination } = result.data;
+        
         if (page === 1) {
-          setBills(result.data.bills);
-          setTotalBills(result.data.pagination?.total || 0);
+          setBills(bills);
+          setTotalBills(pagination?.total || 0);
         } else {
-          setBills(prev => [...prev, ...result.data.bills]);
+          setBills(prev => [...prev, ...bills]);
         }
-        setHasMore(page < (result.data.pagination?.pages || 1));
+
+        setHasMore(page < (pagination?.pages || 1));
       } else {
         setHasMore(false);
       }

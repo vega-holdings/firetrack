@@ -4,8 +4,10 @@ A Next.js 14 application for tracking firearms legislation using server actions,
 
 ## Features
 
-- Track and monitor firearms legislation
-- Filter bills by state, status, and keywords
+- Track and monitor firearms legislation at both federal and state levels
+- Filter bills by jurisdiction (federal/state), state, status, and keywords
+- Integration with Congress.gov API for federal bills
+- Integration with OpenStates API for state bills
 - RSS feed integration for legislative updates
 - Basic authentication system
 - Responsive dashboard interface
@@ -90,13 +92,35 @@ firetrack/
 - `DATABASE_URL`: SQLite database URL
 - `NEXTAUTH_SECRET`: Secret key for NextAuth.js session encryption
 - `NEXTAUTH_URL`: Base URL of your application
-- `MOCK_LEGISLATIVE_API`: Set to "true" for development
+- `CONGRESS_API_KEY`: API key from api.data.gov for Congress.gov API access
+- `OPENSTATES_API_KEY`: API key for OpenStates API access
+- `OPENSTATES_API_URL`: OpenStates API base URL
 - `MOCK_LLM_ANALYSIS`: Set to "true" for development
 - `RSS_FEED_URL`: URL for RSS feed (optional for MVP)
+
+## API Keys
+
+### Congress.gov API
+1. Visit [api.data.gov](https://api.data.gov/signup/) to sign up for an API key
+2. Add your API key to the `.env` file as `CONGRESS_API_KEY`
+
+### OpenStates API
+1. Visit [OpenStates.org](https://openstates.org/api/register/) to register for an API key
+2. Add your API key to the `.env` file as `OPENSTATES_API_KEY`
 
 ## Development Notes
 
 - The application uses SQLite for development but can be easily switched to PostgreSQL for production
 - Authentication is implemented with basic credentials for MVP
-- Legislative API calls are mocked for development
+- Both Congress.gov and OpenStates APIs are integrated for comprehensive bill tracking
 - LLM analysis features use mock responses for MVP
+- Rate limiting is implemented for both APIs to stay within usage limits
+
+## Testing API Integration
+
+Test the Congress.gov API integration:
+```bash
+node scripts/test-congress-api.js
+```
+
+This will verify your API key and test the bill search and detail endpoints.
