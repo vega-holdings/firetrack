@@ -1,0 +1,209 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Bill {
+  id                             String    @id
+  identifier                     String
+  title                         String?
+  session                       String?
+  classification                String?    // Stored as JSON string
+  subject                       String?    // Stored as JSON string
+  extras                        String?    // Stored as JSON string
+  openstates_url               String?
+  
+  // Action dates
+  first_action_date            DateTime?
+  latest_action_date           DateTime?
+  latest_action_description    String?
+  latest_passage_date          DateTime?
+  
+  // Jurisdiction details
+  jurisdiction_id              String?
+  jurisdiction_name            String?
+  jurisdiction_classification  String?
+  
+  // Organization details
+  from_organization_id         String?
+  from_organization_name       String?
+  from_organization_classification String?
+  
+  // Timestamps
+  created_at                   DateTime   @default(now())
+  updated_at                   DateTime   @updatedAt
+
+  // Relations
+  sponsors          Sponsor[]
+  documents         Document[]
+  versions          Version[]
+  sources           Source[]
+  abstracts         Abstract[]
+  other_titles      OtherTitle[]
+  other_identifiers OtherIdentifier[]
+  related_bills     RelatedBill[]
+  votes             VoteEvent[]
+  actions           Action[]
+  comments          BillComment[]
+  annotations       BillAnnotation[]
+
+  @@map("bills")
+}
+
+model Sponsor {
+  id        String   @id
+  bill_id   String
+  name      String
+  primary   Boolean?
+  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("sponsors")
+}
+
+model Document {
+  id        String    @id
+  bill_id   String
+  note      String?
+  date      DateTime?
+  links     String?   // Stored as JSON string
+  bill      Bill      @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("documents")
+}
+
+model Version {
+  id        String    @id
+  bill_id   String
+  note      String?
+  date      DateTime?
+  links     String?   // Stored as JSON string
+  bill      Bill      @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("versions")
+}
+
+model Source {
+  id        Int      @id @default(autoincrement())
+  bill_id   String
+  url       String
+  note      String?
+  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("sources")
+}
+
+model Abstract {
+  id        Int      @id @default(autoincrement())
+  bill_id   String
+  abstract  String
+  note      String?
+  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("abstracts")
+}
+
+model OtherTitle {
+  id        Int      @id @default(autoincrement())
+  bill_id   String
+  title     String
+  note      String?
+  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("other_titles")
+}
+
+model OtherIdentifier {
+  id          Int      @id @default(autoincrement())
+  bill_id     String
+  identifier  String
+  bill        Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("other_identifiers")
+}
+
+model RelatedBill {
+  id                  Int      @id @default(autoincrement())
+  bill_id            String
+  identifier         String
+  legislative_session String?
+  relation_type      String?
+  bill               Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("related_bills")
+}
+
+model Action {
+  id                String    @id
+  bill_id          String
+  description      String
+  date             DateTime
+  classification   String?   // Stored as JSON string
+  order            Int
+  organization_name String?
+  bill             Bill      @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("actions")
+}
+
+model VoteEvent {
+  id           String      @id
+  bill_id      String
+  identifier   String
+  motion_text  String
+  start_date   DateTime
+  result       String
+  votes        Vote[]
+  counts       VoteCount[]
+  bill         Bill        @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("vote_events")
+}
+
+model Vote {
+  id            String    @id
+  vote_event_id String
+  option        String
+  voter_name    String
+  voter_id      String?
+  voter_party   String?
+  vote_event    VoteEvent @relation(fields: [vote_event_id], references: [id], onDelete: Cascade)
+
+  @@map("votes")
+}
+
+model VoteCount {
+  id            Int       @id @default(autoincrement())
+  vote_event_id String
+  option        String
+  value         Int
+  vote_event    VoteEvent @relation(fields: [vote_event_id], references: [id], onDelete: Cascade)
+
+  @@map("vote_counts")
+}
+
+model BillComment {
+  id        Int      @id @default(autoincrement())
+  bill_id   String
+  text      String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("bill_comments")
+}
+
+model BillAnnotation {
+  id        Int      @id @default(autoincrement())
+  bill_id   String
+  text      String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@map("bill_annotations")
+}
