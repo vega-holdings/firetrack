@@ -1,4 +1,7 @@
-// This is your Prisma schema file
+// Firetrack Unified Schema
+// Supports SQLite (dev) and PostgreSQL (prod)
+// Run: npx prisma migrate dev --name unified_schema
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,273 +11,681 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model CongressBill {
-  id                String    @id
-  congress          Int       // e.g., 118 for 118th Congress
-  type             String    // e.g., "HR" for House Resolution
-  number           Int       // Bill number
-  title            String?
-  shortTitle       String?
-  introducedDate   DateTime?
-  originChamber    String?   // "House" or "Senate"
-  status           String?   // INTRODUCED, IN_COMMITTEE, PASSED_COMMITTEE, etc.
-  policyArea       String?
-  subjects         String?   // Stored as JSON string
-  summary          String?   // Latest summary text
-  latestActionDate DateTime?
-  latestActionText String?
-  
-  // Relations
-  sponsors         CongressSponsor[]
-  actions          CongressAction[]
-  committees       CongressCommittee[]
-  
+// =============================================================================
+// USER & AUTHENTICATION (NextAuth v5 compatible)
+// =============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   // Hashed password for credentials auth
+
+  // Profile fields
+  displayName String?
+  bio         String?
+
+  // Alert preferences (stored as JSON string for SQLite compatibility)
+  alertPreferences String? @default("{\"emailFrequency\": \"daily\", \"enabledAlertTypes\": [\"status_change\", \"new_action\"]}")
+
   // Timestamps
-  created_at       DateTime   @default(now())
-  updated_at       DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@map("congress_bills")
+  // Relations
+  accounts           Account[]
+  sessions           Session[]
+  trackedBills       TrackedBill[]
+  alertSubscriptions AlertSubscription[]
+  alerts             Alert[]
+  comments           BillComment[]
+  annotations        BillAnnotation[]
+
+  @@map("users")
 }
 
-model CongressSponsor {
-  id              String    @id
-  bill_id         String
-  bioguideId      String?
-  name            String
-  state           String?
-  party           String?
-  district        String?
-  sponsorType     String?   // "Primary" or "Cosponsor"
-  bill            CongressBill @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
 
-  @@map("congress_sponsors")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
 }
 
-model CongressAction {
-  id              String    @id
-  bill_id         String
-  actionDate      DateTime
-  text            String
-  type            String?
-  actionCode      String?
-  sourceSystem    String?
-  actionChamber   String?
-  bill            CongressBill @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
 
-  @@map("congress_actions")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
 }
 
-model CongressCommittee {
-  id              String    @id
-  bill_id         String
-  name            String
-  chamber         String
-  type            String?   // "Standing", "Joint", etc.
-  activity        String?   // Committee's activity on the bill
-  bill            CongressBill @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
 
-  @@map("congress_committees")
+  @@unique([identifier, token])
+  @@map("verification_tokens")
 }
+
+// =============================================================================
+// UNIFIED BILL MODEL
+// =============================================================================
 
 model Bill {
-  id                             String    @id
-  identifier                     String
-  title                         String?
-  session                       String?
-  classification                String?    // Stored as JSON string
-  subject                       String?    // Stored as JSON string
-  extras                        String?    // Stored as JSON string
-  openstates_url               String?
-  
-  // Action dates
-  first_action_date            DateTime?
-  latest_action_date           DateTime?
-  latest_action_description    String?
-  latest_passage_date          DateTime?
-  
-  // Jurisdiction details
-  jurisdiction_id              String?
-  jurisdiction_name            String?
-  jurisdiction_classification  String?
-  
-  // Organization details
-  from_organization_id         String?
-  from_organization_name       String?
-  from_organization_classification String?
-  
+  id         String @id // e.g., "federal-118-hr-1234" or "ocd-bill/12345"
+  identifier String // e.g., "HR1234" or "HB 1234"
+
+  // Core bill info
+  title      String?
+  shortTitle String?
+  summary    String?
+
+  // Jurisdiction - unified field for federal/state
+  jurisdiction String // "federal" or "state"
+  state        String? // Two-letter state code for state bills (e.g., "TX", "CA")
+
+  // Session/Congress info
+  session  String? // Legislative session (e.g., "118" for 118th Congress, "2024" for state)
+  congress Int? // Congress number for federal bills only
+
+  // Bill classification
+  billType       String? // "HR", "S", "HB", "SB", etc.
+  classification String? // JSON array of classifications
+  subjects       String? // JSON array of subjects/topics
+  policyArea     String? // Primary policy area (federal)
+
+  // Chamber/Organization
+  originChamber    String? // "House", "Senate", "upper", "lower"
+  organizationId   String?
+  organizationName String?
+
+  // Status tracking
+  status             String? // Current status
+  latestActionDate   DateTime?
+  latestActionText   String?
+  introducedDate     DateTime?
+  firstActionDate    DateTime?
+  latestPassageDate  DateTime?
+
+  // External URLs/IDs
+  externalUrl   String? // OpenStates URL or Congress.gov URL
+  openstatesId  String? // OpenStates ID (for state bills)
+  congressGovId String? // Congress.gov bill ID (for federal bills)
+
+  // Metadata (JSON string for flexibility)
+  extras String?
+
   // Timestamps
-  created_at                   DateTime   @default(now())
-  updated_at                   DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  sponsors          Sponsor[]
-  documents         Document[]
-  versions          Version[]
-  sources           Source[]
-  abstracts         Abstract[]
-  other_titles      OtherTitle[]
-  other_identifiers OtherIdentifier[]
-  related_bills     RelatedBill[]
-  votes             VoteEvent[]
-  actions           Action[]
-  comments          BillComment[]
-  annotations       BillAnnotation[]
+  sponsors         BillSponsor[]
+  actions          BillAction[]
+  committees       BillCommittee[]
+  documents        BillDocument[]
+  versions         BillVersion[]
+  sources          BillSource[]
+  abstracts        BillAbstract[]
+  otherTitles      BillOtherTitle[]
+  otherIdentifiers BillOtherIdentifier[]
+  relatedBills     BillRelated[]
+  votes            VoteEvent[]
+  statusHistory    BillStatusHistory[]
+  comments         BillComment[]
+  annotations      BillAnnotation[]
+  trackedByUsers   TrackedBill[]
+  alertSubscriptions AlertSubscription[]
+  rssItemMatches   RSSItemMatch[]
 
+  @@index([jurisdiction])
+  @@index([state])
+  @@index([status])
+  @@index([latestActionDate])
+  @@index([introducedDate])
   @@map("bills")
 }
 
-model Sponsor {
-  id             String   @id
-  bill_id        String
-  name           String
-  primary        Boolean?
-  classification String?
-  party          String?
-  title          String?
-  bill           Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
-
-  @@map("sponsors")
-}
-
-model Document {
-  id        String    @id
-  bill_id   String
+// Track bill status changes over time
+model BillStatusHistory {
+  id        String   @id @default(cuid())
+  billId    String
+  status    String
+  timestamp DateTime @default(now())
   note      String?
-  date      DateTime?
-  links     String?   // Stored as JSON string
-  bill      Bill      @relation(fields: [bill_id], references: [id], onDelete: Cascade)
 
-  @@map("documents")
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@map("bill_status_history")
 }
 
-model Version {
-  id        String    @id
-  bill_id   String
-  note      String?
-  date      DateTime?
-  links     String?   // Stored as JSON string
-  bill      Bill      @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+// =============================================================================
+// LEGISLATOR MODEL
+// =============================================================================
 
-  @@map("versions")
+model Legislator {
+  id String @id @default(cuid())
+
+  // External IDs for API linking
+  bioguideId   String? @unique // Congress.gov bioguide ID
+  openstatesId String? @unique // OpenStates person ID
+
+  // Personal info
+  name      String
+  firstName String?
+  lastName  String?
+  fullName  String?
+
+  // Political info
+  party     String? // "Democrat", "Republican", "Independent", etc.
+  state     String? // Two-letter state code
+  district  String? // Congressional/state district
+  chamber   String? // "House", "Senate", "upper", "lower"
+
+  // Current role info
+  title     String? // "Representative", "Senator", etc.
+  inOffice  Boolean @default(true)
+  termStart DateTime?
+  termEnd   DateTime?
+
+  // Contact & media
+  photoUrl String?
+  website  String?
+  phone    String?
+  email    String?
+  address  String?
+
+  // Social media (JSON string)
+  socialMedia String? // { twitter: "...", facebook: "...", etc. }
+
+  // API source metadata
+  apiSource   String? // "congress.gov", "openstates"
+  apiLastSync DateTime?
+  extras      String? // Additional JSON data
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  sponsoredBills     BillSponsor[]
+  individualVotes    Vote[]
+  alertSubscriptions AlertSubscription[]
+
+  @@index([state])
+  @@index([party])
+  @@index([chamber])
+  @@index([inOffice])
+  @@map("legislators")
 }
 
-model Source {
-  id        Int      @id @default(autoincrement())
-  bill_id   String
-  url       String
-  note      String?
-  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+// =============================================================================
+// BILL-RELATED MODELS (Sponsors, Actions, etc.)
+// =============================================================================
 
-  @@map("sources")
+model BillSponsor {
+  id           String  @id @default(cuid())
+  billId       String
+  legislatorId String? // Links to Legislator if matched
+
+  // Sponsor info (from API)
+  name        String
+  isPrimary   Boolean @default(false)
+  sponsorType String? // "Primary", "Cosponsor"
+
+  // Additional info stored from API
+  party    String?
+  state    String?
+  district String?
+  title    String?
+
+  // External IDs for matching
+  bioguideId         String?
+  openstatesPersonId String?
+
+  bill       Bill        @relation(fields: [billId], references: [id], onDelete: Cascade)
+  legislator Legislator? @relation(fields: [legislatorId], references: [id], onDelete: SetNull)
+
+  @@index([billId])
+  @@index([legislatorId])
+  @@map("bill_sponsors")
 }
 
-model Abstract {
-  id        Int      @id @default(autoincrement())
-  bill_id   String
-  abstract  String
-  note      String?
-  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+model BillAction {
+  id     String   @id @default(cuid())
+  billId String
 
-  @@map("abstracts")
+  description String
+  date        DateTime
+  actionOrder Int      @default(0)
+
+  // Action classification
+  actionType     String? // e.g., "introduction", "referral", "passage"
+  actionCode     String? // Official action code
+  classification String? // JSON array of classifications
+
+  // Which body took the action
+  chamber          String?
+  organizationName String?
+  sourceSystem     String?
+
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@index([date])
+  @@map("bill_actions")
 }
 
-model OtherTitle {
-  id        Int      @id @default(autoincrement())
-  bill_id   String
-  title     String
-  note      String?
-  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+model BillCommittee {
+  id     String @id @default(cuid())
+  billId String
 
-  @@map("other_titles")
+  name     String
+  chamber  String?
+  type     String? // "Standing", "Joint", "Select", etc.
+  activity String? // What the committee did with the bill
+
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@map("bill_committees")
 }
 
-model OtherIdentifier {
-  id          Int      @id @default(autoincrement())
-  bill_id     String
-  identifier  String
-  bill        Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+model BillDocument {
+  id     String    @id @default(cuid())
+  billId String
 
-  @@map("other_identifiers")
+  note  String?
+  date  DateTime?
+  links String? // JSON array of { url, mediaType }
+
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@map("bill_documents")
 }
 
-model RelatedBill {
-  id                  Int      @id @default(autoincrement())
-  bill_id            String
-  identifier         String
-  legislative_session String?
-  relation_type      String?
-  bill               Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+model BillVersion {
+  id     String    @id @default(cuid())
+  billId String
 
-  @@map("related_bills")
+  note  String? // e.g., "Introduced", "Engrossed", "Enrolled"
+  date  DateTime?
+  links String? // JSON array of { url, mediaType }
+
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@map("bill_versions")
 }
 
-model Action {
-  id                String    @id
-  bill_id          String
-  description      String
-  date             DateTime
-  classification   String?   // Stored as JSON string
-  order            Int
-  organization_name String?
-  bill             Bill      @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+model BillSource {
+  id     String @id @default(cuid())
+  billId String
 
-  @@map("actions")
+  url  String
+  note String?
+
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@map("bill_sources")
 }
+
+model BillAbstract {
+  id     String @id @default(cuid())
+  billId String
+
+  abstract String
+  note     String?
+
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@map("bill_abstracts")
+}
+
+model BillOtherTitle {
+  id     String @id @default(cuid())
+  billId String
+
+  title String
+  note  String?
+
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@map("bill_other_titles")
+}
+
+model BillOtherIdentifier {
+  id     String @id @default(cuid())
+  billId String
+
+  identifier String
+  scheme     String? // e.g., "openstates", "congress.gov"
+
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@map("bill_other_identifiers")
+}
+
+model BillRelated {
+  id     String @id @default(cuid())
+  billId String
+
+  relatedBillIdentifier String
+  relatedBillId         String? // If we have the bill in our DB
+  legislativeSession    String?
+  relationType          String? // "companion", "identical", "related"
+
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@map("bill_related")
+}
+
+// =============================================================================
+// VOTING RECORDS
+// =============================================================================
 
 model VoteEvent {
-  id           String      @id
-  bill_id      String
-  identifier   String
-  motion_text  String
-  start_date   DateTime
-  result       String
-  votes        Vote[]
-  counts       VoteCount[]
-  bill         Bill        @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+  id     String   @id @default(cuid())
+  billId String
 
+  identifier String
+  motionText String
+  startDate  DateTime
+  result     String // "pass", "fail"
+  chamber    String?
+
+  bill   Bill        @relation(fields: [billId], references: [id], onDelete: Cascade)
+  votes  Vote[]
+  counts VoteCount[]
+
+  @@index([billId])
   @@map("vote_events")
 }
 
 model Vote {
-  id            String    @id
-  vote_event_id String
-  option        String
-  voter_name    String
-  voter_id      String?
-  voter_party   String?
-  vote_event    VoteEvent @relation(fields: [vote_event_id], references: [id], onDelete: Cascade)
+  id           String  @id @default(cuid())
+  voteEventId  String
+  legislatorId String?
 
+  option     String // "yes", "no", "abstain", "not voting"
+  voterName  String
+  voterId    String? // External voter ID
+  voterParty String?
+
+  voteEvent  VoteEvent   @relation(fields: [voteEventId], references: [id], onDelete: Cascade)
+  legislator Legislator? @relation(fields: [legislatorId], references: [id], onDelete: SetNull)
+
+  @@index([voteEventId])
+  @@index([legislatorId])
   @@map("votes")
 }
 
 model VoteCount {
-  id            Int       @id @default(autoincrement())
-  vote_event_id String
-  option        String
-  value         Int
-  vote_event    VoteEvent @relation(fields: [vote_event_id], references: [id], onDelete: Cascade)
+  id          String @id @default(cuid())
+  voteEventId String
 
+  option String // "yes", "no", "abstain", etc.
+  value  Int
+
+  voteEvent VoteEvent @relation(fields: [voteEventId], references: [id], onDelete: Cascade)
+
+  @@index([voteEventId])
   @@map("vote_counts")
 }
 
-model BillComment {
-  id        Int      @id @default(autoincrement())
-  bill_id   String
-  text      String
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+// =============================================================================
+// USER TRACKING & INTERACTIONS
+// =============================================================================
 
+model TrackedBill {
+  id     String @id @default(cuid())
+  userId String
+  billId String
+
+  // Tracking preferences
+  notes    String?
+  priority Int     @default(0) // User-defined priority
+  tags     String? // JSON array of user-defined tags
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, billId])
+  @@map("tracked_bills")
+}
+
+model BillComment {
+  id     String  @id @default(cuid())
+  billId String
+  userId String? // Null for anonymous/system comments
+
+  text     String
+  isPublic Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bill Bill  @relation(fields: [billId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([billId])
+  @@index([userId])
   @@map("bill_comments")
 }
 
 model BillAnnotation {
-  id        Int      @id @default(autoincrement())
-  bill_id   String
-  text      String
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  bill      Bill     @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+  id     String  @id @default(cuid())
+  billId String
+  userId String? // Null for system-generated annotations (LLM analysis)
 
+  text String
+  type String? // "analysis", "summary", "note"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bill Bill  @relation(fields: [billId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([billId])
+  @@index([userId])
   @@map("bill_annotations")
+}
+
+// =============================================================================
+// ALERT SYSTEM
+// =============================================================================
+
+model AlertSubscription {
+  id     String @id @default(cuid())
+  userId String
+
+  // What to watch
+  billId       String? // Subscribe to specific bill
+  legislatorId String? // Subscribe to legislator's activity
+  state        String? // Subscribe to all bills in a state
+
+  // Alert configuration (JSON string for SQLite compatibility)
+  alertTypes String @default("[\"status_change\", \"new_action\"]") // JSON array
+  frequency  String @default("daily") // "immediate", "daily", "weekly"
+  isActive   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bill       Bill?       @relation(fields: [billId], references: [id], onDelete: Cascade)
+  legislator Legislator? @relation(fields: [legislatorId], references: [id], onDelete: Cascade)
+  alerts     Alert[]
+
+  @@index([userId])
+  @@index([billId])
+  @@index([legislatorId])
+  @@index([isActive])
+  @@map("alert_subscriptions")
+}
+
+model Alert {
+  id             String @id @default(cuid())
+  userId         String
+  subscriptionId String?
+
+  alertType String // "status_change", "new_action", "new_bill_by_legislator", etc.
+  title     String
+  message   String
+
+  // What triggered the alert
+  triggeredByBillId       String?
+  triggeredByLegislatorId String?
+  triggerData             String? // JSON for additional context
+
+  // Delivery status
+  isRead         Boolean   @default(false)
+  sentAt         DateTime?
+  deliveryStatus String? // "pending", "sent", "failed"
+  errorMessage   String?
+
+  createdAt DateTime @default(now())
+
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription AlertSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("alerts")
+}
+
+// =============================================================================
+// RSS/EXTERNAL SOURCES
+// =============================================================================
+
+model RSSFeed {
+  id String @id @default(cuid())
+
+  name        String
+  url         String  @unique
+  description String?
+  category    String? // "legislative", "news", "organization"
+
+  // Feed status
+  status      String    @default("active") // "active", "paused", "error", "disabled"
+  lastFetched DateTime?
+  lastError   String?
+
+  // Matching configuration (JSON strings)
+  matchKeywords String? // JSON array of keywords to match
+  autoMatch     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items RSSItem[]
+
+  @@index([status])
+  @@map("rss_feeds")
+}
+
+model RSSItem {
+  id     String @id @default(cuid())
+  feedId String
+
+  title          String
+  link           String
+  content        String?
+  contentSnippet String?
+  pubDate        DateTime?
+  guid           String? // Unique identifier from the feed
+  categories     String? // JSON array of category strings
+
+  // Processing status
+  isProcessed Boolean   @default(false)
+  processedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  feed        RSSFeed        @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  billMatches RSSItemMatch[]
+
+  @@unique([feedId, guid])
+  @@index([feedId])
+  @@index([pubDate])
+  @@index([isProcessed])
+  @@map("rss_items")
+}
+
+model RSSItemMatch {
+  id        String @id @default(cuid())
+  rssItemId String
+  billId    String
+
+  matchScore Float? // Confidence score 0-1
+  matchType  String? // "keyword", "identifier", "manual"
+
+  createdAt DateTime @default(now())
+
+  rssItem RSSItem @relation(fields: [rssItemId], references: [id], onDelete: Cascade)
+  bill    Bill    @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@unique([rssItemId, billId])
+  @@index([rssItemId])
+  @@index([billId])
+  @@map("rss_item_matches")
+}
+
+// =============================================================================
+// SYNC TRACKING
+// =============================================================================
+
+model SyncLog {
+  id String @id @default(cuid())
+
+  source   String // "openstates", "congress.gov", "rss"
+  sourceId String? // Specific feed or state
+
+  status      String    @default("started") // "started", "completed", "failed"
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  recordsProcessed Int @default(0)
+  recordsCreated   Int @default(0)
+  recordsUpdated   Int @default(0)
+  recordsFailed    Int @default(0)
+
+  errorMessage String?
+  details      String? // JSON for additional details
+
+  @@index([source])
+  @@index([startedAt])
+  @@index([status])
+  @@map("sync_logs")
 }

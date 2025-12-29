@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { SessionProvider } from "next-auth/react";
 import { useDarkMode } from "@/lib/store/index";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -16,8 +17,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, [darkMode]);
 
   return (
-    <div className={darkMode ? "dark" : ""}>
-      {children}
-    </div>
+    <SessionProvider>
+      <div className={darkMode ? "dark" : ""}>
+        {children}
+      </div>
+    </SessionProvider>
   );
 }

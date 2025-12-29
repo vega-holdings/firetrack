@@ -3,9 +3,14 @@ import { formatDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { notFound } from "next/navigation";
 
-export default async function BillPage({ params }: { params: { id: string } }) {
+export default async function BillPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
   // Add 'ocd-bill/' prefix back for database lookup
-  const result = await getBillById(`ocd-bill/${params.id}`);
+  const result = await getBillById(`ocd-bill/${id}`);
 
   if (!result.success || !result.data) {
     notFound();
