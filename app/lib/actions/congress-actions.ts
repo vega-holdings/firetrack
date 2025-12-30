@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/db";
+import { prisma } from "@/lib/db/client";
 import axios from "axios";
-import type { CreateSponsorInput, CreateActionInput } from "@/lib/db";
+import type { CreateSponsorInput, CreateActionInput } from "@/lib/db/types";
 
 // Congress.gov API configuration
 const CONGRESS_API_URL = "https://api.congress.gov/v3";

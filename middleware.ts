@@ -1,8 +1,12 @@
-import { auth } from "@/auth";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth?.user;
-  const { pathname } = req.nextUrl;
+/**
+ * Middleware for route protection
+ * Uses JWT token check without importing full auth module to avoid Edge Runtime issues
+ */
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
 
   // Protected routes that require authentication
   const protectedRoutes = ["/dashboard", "/settings", "/tracking"];
@@ -13,37 +17,35 @@ export default auth((req) => {
   // Auth routes (signin, signup, etc.)
   const isAuthRoute = pathname.startsWith("/auth/");
 
-  // API routes that should be protected
-  const isProtectedApi =
-    pathname.startsWith("/api/") &&
-    !pathname.startsWith("/api/auth") &&
-    !pathname.startsWith("/api/chat"); // Chat can be public for now
+  // Check for session token (next-auth uses this cookie name)
+  const sessionToken =
+    request.cookies.get("authjs.session-token")?.value ||
+    request.cookies.get("__Secure-authjs.session-token")?.value;
+
+  const isLoggedIn = !!sessionToken;
 
   // Redirect unauthenticated users away from protected routes
   if (isProtectedRoute && !isLoggedIn) {
     const callbackUrl = encodeURIComponent(pathname);
-    return Response.redirect(
-      new URL(`/auth/signin?callbackUrl=${callbackUrl}`, req.nextUrl)
+    return NextResponse.redirect(
+      new URL(`/auth/signin?callbackUrl=${callbackUrl}`, request.url)
     );
   }
 
-  // Redirect authenticated users away from auth pages
+  // Redirect authenticated users away from auth pages (except signout)
   if (isAuthRoute && isLoggedIn && pathname !== "/auth/signout") {
-    return Response.redirect(new URL("/dashboard", req.nextUrl));
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // Optional: Protect certain API routes
-  if (isProtectedApi && !isLoggedIn) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-});
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: [
-    // Skip static files and images
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Match protected routes and auth routes
+    "/dashboard/:path*",
+    "/settings/:path*",
+    "/tracking/:path*",
+    "/auth/:path*",
   ],
 };

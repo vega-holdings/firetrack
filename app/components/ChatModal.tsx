@@ -3,7 +3,7 @@
 import { useChat } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { MessageSquare, X, Paperclip, Send } from "lucide-react";
-import { useChat as useVercelChat } from "ai/react";
+import { useChat as useVercelChat } from "@ai-sdk/react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useRef } from "react";
 import { cn } from "@/lib/utils";

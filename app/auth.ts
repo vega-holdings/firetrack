@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import { type DefaultSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { prisma } from "@/lib/db";
+import { prisma } from "@/lib/db/client";
 
 // Extend the built-in session type
 declare module "next-auth" {
@@ -17,12 +17,7 @@ declare module "next-auth" {
   }
 }
 
-export const {
-  handlers: { GET, POST },
-  auth,
-  signIn,
-  signOut,
-} = NextAuth({
+export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     // Credentials provider for email/password login
     CredentialsProvider({

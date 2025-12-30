@@ -1,10 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma, billRepository } from "@/lib/db";
-import type { BillFilters, PaginationParams, BillWithRelations } from "@/lib/db";
+import { prisma } from "@/lib/db/client";
+import { billRepository } from "@/lib/db/repositories/bill.repository";
+import type {
+  BillFilters,
+  PaginationParams,
+  BillWithRelations,
+  CreateSponsorInput,
+  CreateActionInput,
+} from "@/lib/db/types";
 import axios from "axios";
-import type { CreateSponsorInput, CreateActionInput } from "@/lib/db";
 
 // Rate limiting configuration
 const RATE_LIMIT = {

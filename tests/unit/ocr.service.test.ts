@@ -34,16 +34,18 @@ vi.mock("sharp", () => ({
 }));
 
 // Mock fs/promises properly
-vi.mock("fs/promises", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("fs/promises")>();
-  return {
-    ...actual,
+vi.mock("fs/promises", () => ({
+  default: {
     writeFile: vi.fn().mockResolvedValue(undefined),
     readFile: vi.fn().mockResolvedValue(Buffer.from("image content")),
     unlink: vi.fn().mockResolvedValue(undefined),
     mkdir: vi.fn().mockResolvedValue(undefined),
-  };
-});
+  },
+  writeFile: vi.fn().mockResolvedValue(undefined),
+  readFile: vi.fn().mockResolvedValue(Buffer.from("image content")),
+  unlink: vi.fn().mockResolvedValue(undefined),
+  mkdir: vi.fn().mockResolvedValue(undefined),
+}));
 
 // Mock pdf-parse
 vi.mock("pdf-parse", () => ({

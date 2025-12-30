@@ -3,6 +3,6 @@
  * Handles authentication endpoints
  */
 
-import { GET, POST } from "@/auth";
+import { handlers } from "@/auth";
 
-export { GET, POST };
+export const { GET, POST } = handlers;
