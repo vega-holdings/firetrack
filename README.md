@@ -1,6 +1,6 @@
 # Firearms Legislation Tracker
 
-A Next.js 14 application for tracking firearms legislation using server actions, Prisma, and SQLite.
+A Next.js 15 application for tracking firearms legislation at federal and state levels, with PDF processing, OCR capabilities, and comprehensive bill management.
 
 ## Features
 
@@ -8,19 +8,22 @@ A Next.js 14 application for tracking firearms legislation using server actions,
 - Filter bills by jurisdiction (federal/state), state, status, and keywords
 - Integration with Congress.gov API for federal bills
 - Integration with OpenStates API for state bills
-- RSS feed integration for legislative updates
-- Basic authentication system
+- PDF text extraction with OCR fallback for scanned documents
+- User authentication with protected routes
 - Responsive dashboard interface
+- Bill tracking and alerts system
 
 ## Tech Stack
 
-- **Framework**: Next.js 14 with App Router
-- **Language**: TypeScript
-- **Database**: Prisma with SQLite
-- **Authentication**: NextAuth.js v5 (beta)
-- **State Management**: Zustand
+- **Framework**: Next.js 15 with App Router
+- **Language**: TypeScript 5 (strict mode)
+- **Database**: Prisma with SQLite (dev) / PostgreSQL (prod)
+- **Authentication**: NextAuth.js v5
+- **State Management**: Zustand with persistence
 - **Styling**: Tailwind CSS + shadcn/ui
-- **Form Handling**: React Hook Form + Zod
+- **Validation**: Zod
+- **Testing**: Vitest + Playwright
+- **PDF Processing**: pdf-parse + Tesseract.js + Sharp
 
 ## Getting Started
 
@@ -32,7 +35,7 @@ A Next.js 14 application for tracking firearms legislation using server actions,
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/firetrack.git
+   git clone https://github.com/vega-holdings/firetrack.git
    cd firetrack
    ```
 
@@ -68,35 +71,62 @@ npm run dev
 
 Visit [http://localhost:3000](http://localhost:3000) to see the application.
 
-### Authentication
+### Running Tests
 
-For the MVP, use these credentials:
-- Username: admin
-- Password: password
+```bash
+npm run test          # Run all unit tests
+npm run test:watch    # Run tests in watch mode
+npm run test:coverage # Run tests with coverage
+npm run test:e2e      # Run Playwright E2E tests
+```
 
 ## Project Structure
 
 ```
 firetrack/
-├── app/                    # Next.js app directory
-│   ├── api/               # API routes
-│   ├── auth/              # Auth-related pages
-│   ├── components/        # React components
-│   └── lib/               # Utility functions, hooks, etc.
-├── prisma/                # Prisma schema and migrations
-└── public/               # Static files
+├── app/
+│   ├── api/                    # API routes
+│   ├── auth/                   # Auth pages (signin, etc.)
+│   ├── components/
+│   │   ├── bills/              # Bill-related components
+│   │   ├── sync/               # Sync UI components
+│   │   ├── ui/                 # shadcn/ui primitives
+│   │   └── ...
+│   ├── dashboard/              # User dashboard (protected)
+│   ├── lib/
+│   │   ├── actions/            # Server actions
+│   │   ├── db/                 # Database abstraction layer
+│   │   │   ├── repositories/   # Repository pattern implementations
+│   │   │   └── types/          # Database entity types
+│   │   ├── services/           # Business logic layer
+│   │   │   └── document/       # PDF/OCR processing
+│   │   ├── store/              # Zustand state management
+│   │   └── types/              # Shared TypeScript types
+│   └── ...
+├── prisma/                     # Prisma schema and migrations
+├── tests/
+│   ├── unit/                   # Unit tests
+│   └── integration/            # Integration tests
+└── types/                      # TypeScript type declarations
 ```
 
 ## Environment Variables
 
-- `DATABASE_URL`: SQLite database URL
+### Required
+- `DATABASE_URL`: Database connection string
 - `NEXTAUTH_SECRET`: Secret key for NextAuth.js session encryption
 - `NEXTAUTH_URL`: Base URL of your application
+
+### API Keys
 - `CONGRESS_API_KEY`: API key from api.data.gov for Congress.gov API access
 - `OPENSTATES_API_KEY`: API key for OpenStates API access
 - `OPENSTATES_API_URL`: OpenStates API base URL
-- `MOCK_LLM_ANALYSIS`: Set to "true" for development
-- `RSS_FEED_URL`: URL for RSS feed (optional for MVP)
+
+### Optional
+- `OPENAI_API_KEY`: For AI-powered bill analysis
+- `ANTHROPIC_API_KEY`: For Claude-powered features
+- `UPSTASH_REDIS_REST_URL`: For rate limiting
+- `UPSTASH_REDIS_REST_TOKEN`: For rate limiting
 
 ## API Keys
 
@@ -108,19 +138,58 @@ firetrack/
 1. Visit [OpenStates.org](https://openstates.org/api/register/) to register for an API key
 2. Add your API key to the `.env` file as `OPENSTATES_API_KEY`
 
+## Architecture
+
+The application follows a layered architecture:
+
+1. **UI Layer** - React components (server-first, client when needed)
+2. **Application Layer** - Server actions and API routes
+3. **Domain Layer** - Business logic in services
+4. **Infrastructure Layer** - Repositories, API clients, external integrations
+
+Key patterns:
+- **Repository Pattern** - All database access through `app/lib/db/repositories/`
+- **Service Layer** - Business logic in `app/lib/services/`
+- **Unified Bill Model** - Single model for both federal and state bills
+
+## PDF & OCR Processing
+
+The application can extract text from bill PDFs:
+
+1. **Text Extraction** - Uses pdf-parse for native PDF text
+2. **OCR Fallback** - Uses Tesseract.js for scanned documents
+3. **Image Preprocessing** - Sharp for better OCR accuracy
+
+For full OCR on scanned PDFs, install Poppler:
+- **Windows**: Download from https://github.com/oschwartz10612/poppler-windows
+- **macOS**: `brew install poppler`
+- **Linux**: `apt-get install poppler-utils`
+
+## Route Protection
+
+- **Public routes**: `/`, `/bills/*`, `/federal/*` - Browse without login
+- **Protected routes**: `/dashboard`, `/settings`, `/tracking` - Require authentication
+
 ## Development Notes
 
-- The application uses SQLite for development but can be easily switched to PostgreSQL for production
-- Authentication is implemented with basic credentials for MVP
-- Both Congress.gov and OpenStates APIs are integrated for comprehensive bill tracking
-- LLM analysis features use mock responses for MVP
-- Rate limiting is implemented for both APIs to stay within usage limits
+- Uses SQLite for development, PostgreSQL-compatible for production
+- Rate limiting implemented for both Congress.gov and OpenStates APIs
+- 31 passing tests covering repositories, PDF processing, and OCR
 
-## Testing API Integration
+## Scripts
 
-Test the Congress.gov API integration:
 ```bash
-node scripts/test-congress-api.js
+npm run dev           # Start development server with Turbopack
+npm run build         # Build for production
+npm run start         # Start production server
+npm run lint          # Run ESLint
+npm run test          # Run unit tests
+npm run db:generate   # Generate Prisma client
+npm run db:push       # Push schema to database
+npm run db:migrate    # Create and apply migrations
+npm run db:studio     # Open Prisma Studio
 ```
 
-This will verify your API key and test the bill search and detail endpoints.
+## License
+
+Private - All rights reserved.
